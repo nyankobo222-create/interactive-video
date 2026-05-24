@@ -65,7 +65,8 @@ function requireAuth(req, res, next) {
   res.status(401).json({ error: "Unauthorized" });
 }
 
-app.use("/api/projects", requireAuth);
+// GET /api/projects/:id はプレイヤーが使うため認証不要
+// その他の書き込み系ルートは個別に requireAuth を適用
 
 // ── ファイルアップロード設定 ────────────────────────────────
 const memStorage = multer.memoryStorage();
@@ -88,8 +89,8 @@ async function writeProject(project) {
 
 // ── API ────────────────────────────────────────────────────
 
-// プロジェクト一覧
-app.get("/api/projects", async (_req, res) => {
+// プロジェクト一覧（管理画面用・認証必要）
+app.get("/api/projects", requireAuth, async (_req, res) => {
   try {
     const files = (await fsp.readdir(DATA_DIR)).filter((f) => f.endsWith(".json"));
     const list = await Promise.all(
@@ -103,7 +104,7 @@ app.get("/api/projects", async (_req, res) => {
 });
 
 // 新規プロジェクト作成
-app.post("/api/projects", async (_req, res) => {
+app.post("/api/projects", requireAuth, async (_req, res) => {
   const id = uuidv4().slice(0, 8);
   const project = {
     id,
@@ -147,7 +148,7 @@ app.get("/api/projects/:id", async (req, res) => {
 });
 
 // プロジェクト更新
-app.put("/api/projects/:id", async (req, res) => {
+app.put("/api/projects/:id", requireAuth, async (req, res) => {
   try {
     const existing = await readProject(req.params.id);
     const updated = { ...existing, ...req.body, id: existing.id, createdAt: existing.createdAt };
@@ -156,7 +157,7 @@ app.put("/api/projects/:id", async (req, res) => {
 });
 
 // プロジェクト複製
-app.post("/api/projects/:id/duplicate", async (req, res) => {
+app.post("/api/projects/:id/duplicate", requireAuth, async (req, res) => {
   try {
     const src = await readProject(req.params.id);
     const newId = uuidv4().slice(0, 8);
@@ -174,7 +175,7 @@ app.post("/api/projects/:id/duplicate", async (req, res) => {
 });
 
 // プロジェクト削除
-app.delete("/api/projects/:id", async (req, res) => {
+app.delete("/api/projects/:id", requireAuth, async (req, res) => {
   try {
     await fsp.unlink(projectPath(req.params.id));
     const uploadsDir = path.join(UPLOADS_DIR, req.params.id);
@@ -185,7 +186,7 @@ app.delete("/api/projects/:id", async (req, res) => {
 
 // エンドオーバーレイ画像アップロード
 app.post("/api/projects/:id/upload/end-overlay",
-  uploadEndOverlay.single("image"),
+  requireAuth, uploadEndOverlay.single("image"),
   async (req, res) => {
     const { id } = req.params;
     const ext = path.extname(req.file.originalname).toLowerCase() || ".png";
@@ -209,7 +210,7 @@ app.post("/api/projects/:id/upload/end-overlay",
 
 // オーバーレイ画像アップロード（動画ルートより先に定義すること）
 app.post("/api/projects/:id/upload/overlay",
-  uploadOverlay.single("image"),
+  requireAuth, uploadOverlay.single("image"),
   async (req, res) => {
     const { id } = req.params;
     const ext = path.extname(req.file.originalname).toLowerCase() || ".png";
@@ -233,7 +234,7 @@ app.post("/api/projects/:id/upload/overlay",
 
 // 動画アップロード
 app.post("/api/projects/:projectId/upload/:chapterId",
-  upload.single("video"),
+  requireAuth, upload.single("video"),
   async (req, res) => {
     const { projectId, chapterId } = req.params;
     const key = `${projectId}/${chapterId}.mp4`;
