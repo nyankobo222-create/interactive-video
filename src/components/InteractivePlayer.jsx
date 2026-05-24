@@ -75,6 +75,24 @@ function SeekBar({ currentTime, duration, onSeek, canSeek, primaryColor }) {
   );
 }
 
+function PlayPauseBtn({ isPlaying, onToggle, disabled }) {
+  return (
+    <button
+      className="player__pp-btn"
+      onClick={onToggle}
+      disabled={disabled}
+      title={isPlaying ? "一時停止" : "再生"}
+    >
+      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+        {isPlaying
+          ? <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+          : <path d="M8 5v14l11-7z"/>
+        }
+      </svg>
+    </button>
+  );
+}
+
 function requestFullscreen(el) {
   if (el.requestFullscreen) el.requestFullscreen();
   else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
@@ -127,6 +145,7 @@ export default function InteractivePlayer({ config }) {
   const [aspectRatio, setAspectRatio] = useState("16/9");
   const [playbackTime, setPlaybackTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const chaptersMap = Array.isArray(config.chapters)
     ? Object.fromEntries(config.chapters.map((c) => [c.id, c]))
@@ -173,6 +192,29 @@ export default function InteractivePlayer({ config }) {
       videoRef.current.src = ch.url;
     }
   }, [config]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const onPlay  = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    video.addEventListener("play",  onPlay);
+    video.addEventListener("pause", onPause);
+    return () => {
+      video.removeEventListener("play",  onPlay);
+      video.removeEventListener("pause", onPause);
+    };
+  }, []);
+
+  function handleTogglePlay() {
+    const video = videoRef.current;
+    if (!video) return;
+    if (isPlaying) {
+      video.pause();
+    } else {
+      video.play().catch(() => {});
+    }
+  }
 
   const handleTimeUpdate = useCallback((t) => {
     setPlaybackTime(t);
@@ -283,9 +325,14 @@ export default function InteractivePlayer({ config }) {
           : <BranchMenu config={config} phase={phase} onBranchSelect={handleBranchSelect} onGoTop={handleGoTop} />
       )}
 
-      {/* シークバー */}
+      {/* コントロールバー */}
       {started && (
         <div className="player__controls">
+          <PlayPauseBtn
+            isPlaying={isPlaying}
+            onToggle={handleTogglePlay}
+            disabled={isDemo || phase === "branch_select" || phase === "end_menu"}
+          />
           <SeekBar
             currentTime={playbackTime}
             duration={duration}
