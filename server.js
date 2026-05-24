@@ -6,6 +6,7 @@ import fsp from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import crypto from "crypto";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -19,6 +20,26 @@ fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 app.use(express.json());
 app.use("/uploads", express.static(UPLOADS_DIR));
+
+// ── 認証 ──────────────────────────────────────────────────
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
+const ADMIN_TOKEN = crypto.createHash("sha256").update(ADMIN_PASSWORD).digest("hex");
+
+app.post("/api/auth/login", (req, res) => {
+  if (req.body.password === ADMIN_PASSWORD) {
+    res.json({ token: ADMIN_TOKEN });
+  } else {
+    res.status(401).json({ error: "パスワードが違います" });
+  }
+});
+
+function requireAuth(req, res, next) {
+  const token = (req.headers.authorization || "").replace("Bearer ", "");
+  if (token === ADMIN_TOKEN) return next();
+  res.status(401).json({ error: "Unauthorized" });
+}
+
+app.use("/api/projects", requireAuth);
 
 // ── ファイルアップロード設定 ────────────────────────────────
 const storage = multer.diskStorage({

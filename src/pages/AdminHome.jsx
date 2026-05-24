@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AdminHome.css";
+import { authHeaders, logout } from "../auth";
 
 export default function AdminHome() {
   const [projects, setProjects] = useState([]);
@@ -8,7 +9,8 @@ export default function AdminHome() {
   const nav = useNavigate();
 
   async function load() {
-    const res = await fetch("/api/projects");
+    const res = await fetch("/api/projects", { headers: authHeaders() });
+    if (res.status === 401) { logout(); return; }
     setProjects(await res.json());
     setLoading(false);
   }
@@ -16,19 +18,19 @@ export default function AdminHome() {
   useEffect(() => { load(); }, []);
 
   async function createProject() {
-    const res = await fetch("/api/projects", { method: "POST" });
+    const res = await fetch("/api/projects", { method: "POST", headers: authHeaders() });
     const p = await res.json();
     nav(`/admin/${p.id}`);
   }
 
   async function duplicateProject(id) {
-    await fetch(`/api/projects/${id}/duplicate`, { method: "POST" });
+    await fetch(`/api/projects/${id}/duplicate`, { method: "POST", headers: authHeaders() });
     load();
   }
 
   async function deleteProject(id, name) {
     if (!confirm(`「${name}」を削除しますか？`)) return;
-    await fetch(`/api/projects/${id}`, { method: "DELETE" });
+    await fetch(`/api/projects/${id}`, { method: "DELETE", headers: authHeaders() });
     load();
   }
 
@@ -39,6 +41,7 @@ export default function AdminHome() {
         <button className="btn btn--primary" onClick={createProject}>
           ＋ 新規プロジェクト作成
         </button>
+        <button className="btn btn--gray btn--sm" onClick={logout}>ログアウト</button>
       </header>
 
       <main className="admin-home__main">

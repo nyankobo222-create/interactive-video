@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import "./ProjectEditor.css";
+import { authHeaders, logout } from "../auth";
 
 // ── チャプター1枚 ────────────────────────────────────────
 function ChapterRow({ chapter, projectId, onChange, onDelete, onMove, isFirst, isLast }) {
@@ -14,7 +15,7 @@ function ChapterRow({ chapter, projectId, onChange, onDelete, onMove, isFirst, i
     const fd = new FormData();
     fd.append("video", file);
     const res = await fetch(`/api/projects/${projectId}/upload/${chapter.id}`, {
-      method: "POST", body: fd,
+      method: "POST", body: fd, headers: authHeaders(),
     });
     const { url } = await res.json();
     onChange({ ...chapter, url });
@@ -160,7 +161,7 @@ function VisualEditor({ project, onChange, onSave }) {
       const fd = new FormData();
       fd.append("image", file);
       const res = await fetch(`/api/projects/${project.id}/upload/${uploadPath}`, {
-        method: "POST", body: fd,
+        method: "POST", body: fd, headers: authHeaders(),
       });
       if (!res.ok) throw new Error(`サーバーエラー: ${res.status}`);
       const { url } = await res.json();
@@ -423,9 +424,10 @@ export default function ProjectEditor() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/projects/${id}`)
-      .then((r) => r.json())
-      .then(setProject);
+    fetch(`/api/projects/${id}`, { headers: authHeaders() })
+      .then((r) => { if (r.status === 401) { logout(); throw new Error(); } return r.json(); })
+      .then(setProject)
+      .catch(() => {});
   }, [id]);
 
   async function save(overrideProject) {
@@ -434,7 +436,7 @@ export default function ProjectEditor() {
       const data = overrideProject ?? project;
       const res = await fetch(`/api/projects/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(data),
       });
       if (!res.ok) {

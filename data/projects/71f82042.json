@@ -1,0 +1,141 @@
+{
+  "id": "71f82042",
+  "createdAt": "2026-05-23T08:07:55.042Z",
+  "updatedAt": "2026-05-23T08:07:55.042Z",
+  "company": {
+    "name": "新しいプロジェクト",
+    "phone": "",
+    "contactUrl": ""
+  },
+  "theme": {
+    "primary": "#2a9824"
+  },
+  "chapters": [
+    {
+      "id": "C01",
+      "label": "オープニング",
+      "url": null,
+      "demoDuration": 15
+    },
+    {
+      "id": "C02",
+      "label": "タイトル①",
+      "url": null,
+      "demoDuration": 4
+    },
+    {
+      "id": "C03",
+      "label": "インタビュー①-1",
+      "url": null,
+      "demoDuration": 8
+    },
+    {
+      "id": "C04",
+      "label": "インタビュー①-2",
+      "url": null,
+      "demoDuration": 8
+    },
+    {
+      "id": "C05",
+      "label": "インタビュー①-3",
+      "url": null,
+      "demoDuration": 8
+    },
+    {
+      "id": "C06",
+      "label": "タイトル②",
+      "url": null,
+      "demoDuration": 4
+    },
+    {
+      "id": "C07",
+      "label": "インタビュー②-1",
+      "url": null,
+      "demoDuration": 8
+    },
+    {
+      "id": "C08",
+      "label": "インタビュー②-2",
+      "url": null,
+      "demoDuration": 8
+    },
+    {
+      "id": "C09",
+      "label": "インタビュー②-3",
+      "url": null,
+      "demoDuration": 8
+    },
+    {
+      "id": "C10",
+      "label": "タイトル③",
+      "url": null,
+      "demoDuration": 4
+    },
+    {
+      "id": "C11",
+      "label": "インタビュー③-1",
+      "url": null,
+      "demoDuration": 8
+    },
+    {
+      "id": "C12",
+      "label": "インタビュー③-2",
+      "url": null,
+      "demoDuration": 8
+    },
+    {
+      "id": "C13",
+      "label": "インタビュー③-3",
+      "url": null,
+      "demoDuration": 8
+    },
+    {
+      "id": "C14",
+      "label": "エンドメニュー",
+      "url": null,
+      "demoDuration": 15
+    }
+  ],
+  "flow": {
+    "intro": {
+      "chapter": "C01",
+      "pauseAt": 15
+    },
+    "branches": [
+      {
+        "id": "b1",
+        "label": "01 ブランチ名",
+        "sublabel": "Subtitle",
+        "chapters": [
+          "C02",
+          "C03",
+          "C04",
+          "C05"
+        ]
+      },
+      {
+        "id": "b2",
+        "label": "02 ブランチ名",
+        "sublabel": "Subtitle",
+        "chapters": [
+          "C06",
+          "C07",
+          "C08",
+          "C09"
+        ]
+      },
+      {
+        "id": "b3",
+        "label": "03 ブランチ名",
+        "sublabel": "Subtitle",
+        "chapters": [
+          "C10",
+          "C11",
+          "C12",
+          "C13"
+        ]
+      }
+    ],
+    "endMenu": "C14"
+  }
+}
