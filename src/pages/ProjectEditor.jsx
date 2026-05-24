@@ -563,7 +563,32 @@ export default function ProjectEditor() {
         {/* ────── 基本設定タブ ────── */}
         {tab === "basic" && (
           <div className="editor__section">
-            <h2 className="editor__section-title">会社・プロジェクト情報</h2>
+            <h2 className="editor__section-title">公開URL</h2>
+            <div className="player-url-box">
+              <span className="player-url-box__label">プレイヤーURL（共有用）</span>
+              <div className="player-url-box__row">
+                <input
+                  className="form-input player-url-box__input"
+                  readOnly
+                  value={`${window.location.origin}/play/${project.id}`}
+                  onFocus={(e) => e.target.select()}
+                />
+                <button
+                  className="btn btn--outline btn--sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/play/${project.id}`);
+                  }}
+                >コピー</button>
+                <a
+                  className="btn btn--primary btn--sm"
+                  href={`/play/${project.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >開く</a>
+              </div>
+            </div>
+
+            <h2 className="editor__section-title" style={{ marginTop: 32 }}>会社・プロジェクト情報</h2>
             <div className="form-grid">
               <label className="form-label">
                 会社名
