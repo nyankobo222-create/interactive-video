@@ -11,7 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const DATA_DIR    = path.join(__dirname, "data", "projects");
+const DATA_DIR    = path.join(__dirname, "uploads", "data", "projects");
 const UPLOADS_DIR = path.join(__dirname, "uploads");
 
 fs.mkdirSync(DATA_DIR,    { recursive: true });
