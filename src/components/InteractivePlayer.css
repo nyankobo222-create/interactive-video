@@ -1,0 +1,425 @@
+/* ============================================================
+   プレーヤーラッパー
+   ============================================================ */
+.player {
+  position: relative;
+  max-width: min(900px, 95vw);
+  max-height: 90dvh;
+  width: 100%;
+  background: #000;
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+}
+
+.player__video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #000;
+}
+
+/* スタート画面 */
+.player__start {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  z-index: 50;
+  gap: 14px;
+  transition: background 0.2s;
+}
+.player__start:hover { background: rgba(0, 0, 0, 0.4); }
+.player__start-btn {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111;
+  font-size: 1.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 5px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+.player__start-label {
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+
+/* ============================================================
+   シークバー
+   ============================================================ */
+.seekbar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 10px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.65));
+}
+
+.seekbar__time {
+  color: rgba(255,255,255,0.9);
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  min-width: 32px;
+}
+
+.seekbar__track {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.25);
+  border-radius: 2px;
+  position: relative;
+  transition: height 0.15s;
+}
+.seekbar:hover .seekbar__track { height: 6px; }
+
+.seekbar__fill {
+  height: 100%;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.seekbar__thumb {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  pointer-events: none;
+  transition: transform 0.15s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.seekbar:hover .seekbar__thumb { transform: translate(-50%, -50%) scale(1); }
+
+/* ============================================================
+   ビジュアルオーバーレイ（イラレUI画像 + ボタン領域）
+   ============================================================ */
+.visual-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.visual-overlay__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.visual-overlay__btn {
+  position: absolute;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  pointer-events: auto;
+  border-radius: 4px;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: rgba(255,255,255,0.15);
+}
+.visual-overlay__btn:hover,
+.visual-overlay__btn:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ============================================================
+   デモチャプター（動画なし時のプレースホルダー）
+   ============================================================ */
+.demo-chapter {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(ellipse at center, #1a2a1a 0%, #0a0f0a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.demo-chapter__content {
+  text-align: center;
+  color: #fff;
+  padding: 24px;
+  z-index: 1;
+}
+
+.demo-chapter__id {
+  font-size: clamp(2rem, 6vw, 4rem);
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.12);
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+}
+
+.demo-chapter__label {
+  font-size: clamp(0.9rem, 2.5vw, 1.4rem);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.05em;
+}
+
+.demo-chapter__paused {
+  margin-top: 16px;
+  font-size: clamp(0.75rem, 2vw, 0.95rem);
+  color: rgba(255, 255, 255, 0.5);
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.demo-chapter__badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.demo-chapter__progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.demo-chapter__progress-fill {
+  height: 100%;
+  transition: width 0.1s linear;
+  border-radius: 0 2px 2px 0;
+}
+
+/* ============================================================
+   ブランチ選択オーバーレイ
+   ============================================================ */
+.branch-menu {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(3px);
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.branch-menu__inner {
+  width: 100%;
+  max-width: 460px;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.branch-menu__header {
+  text-align: center;
+  color: #fff;
+}
+
+.branch-menu__company {
+  font-size: clamp(0.85rem, 2vw, 1rem);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  margin-bottom: 2px;
+}
+
+.branch-menu__tagline {
+  font-size: clamp(0.65rem, 1.5vw, 0.8rem);
+  letter-spacing: 0.2em;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: 6px;
+}
+
+.branch-menu__prompt {
+  font-size: clamp(0.8rem, 2vw, 1rem);
+  color: rgba(255,255,255,0.85);
+}
+
+.branch-menu__buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.branch-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(10px, 2vw, 14px) clamp(14px, 3vw, 20px);
+  background: var(--primary, #2a9824);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: clamp(0.8rem, 2vw, 1rem);
+  font-weight: 700;
+  font-family: inherit;
+  animation: pulse 2.4s ease-in-out infinite;
+  transition: filter 0.15s;
+}
+
+.branch-btn:hover {
+  filter: brightness(1.15);
+  animation: none;
+}
+
+.branch-btn--top {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  animation: none;
+}
+
+.branch-btn--top:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.018); }
+}
+
+.branch-btn__label {
+  text-align: left;
+}
+
+.branch-btn__sublabel {
+  font-size: clamp(0.65rem, 1.5vw, 0.75rem);
+  font-weight: 400;
+  opacity: 0.8;
+  white-space: nowrap;
+  margin-left: 12px;
+}
+
+.branch-menu__contacts {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.contact-link {
+  color: rgba(255,255,255,0.7);
+  font-size: clamp(0.7rem, 1.8vw, 0.85rem);
+  text-decoration: none;
+  padding: 6px 14px;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 20px;
+  transition: background 0.15s;
+}
+
+.contact-link:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+/* ============================================================
+   ボトムナビバー（ブランチ再生中）
+   ============================================================ */
+.bottom-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.7));
+  backdrop-filter: blur(2px);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.bottom-bar__branches {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.bottom-bar__btn {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: clamp(0.6rem, 1.5vw, 0.72rem);
+  font-weight: 700;
+  font-family: inherit;
+  background: var(--primary, #2a9824);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: filter 0.15s;
+}
+
+.bottom-bar__btn:hover {
+  filter: brightness(1.2);
+}
+
+.bottom-bar__contacts {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.bottom-bar__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 0.9rem;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 4px;
+  color: #fff;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.bottom-bar__icon:hover {
+  background: rgba(255,255,255,0.28);
+}

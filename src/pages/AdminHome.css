@@ -1,0 +1,44 @@
+.admin-home { min-height: 100dvh; display: flex; flex-direction: column; }
+
+.admin-home__header {
+  background: #1b5e20;
+  color: #fff;
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.admin-home__logo { font-size: 1.1rem; font-weight: 700; letter-spacing: .05em; }
+
+.admin-home__main { flex: 1; padding: 32px; max-width: 1200px; margin: 0 auto; width: 100%; }
+.admin-home__empty { text-align: center; padding: 80px 0; color: #78909c; display: flex; flex-direction: column; align-items: center; gap: 20px; font-size: 1rem; }
+
+.project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+
+.project-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.project-card__name { font-size: 1.1rem; font-weight: 700; color: #263238; }
+.project-card__meta { font-size: 0.82rem; color: #90a4ae; }
+.project-card__actions { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+
+/* ── 汎用ボタン ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 9px 18px; border-radius: 6px; font-size: 0.9rem; font-weight: 700;
+  border: none; transition: filter .15s; white-space: nowrap;
+}
+.btn:hover { filter: brightness(1.1); }
+.btn--sm { padding: 6px 12px; font-size: 0.8rem; }
+.btn--primary  { background: #2a9824; color: #fff; }
+.btn--outline  { background: transparent; border: 1.5px solid #2a9824; color: #2a9824; }
+.btn--outline:hover { background: #e8f5e9; }
+.btn--danger   { background: #ffebee; color: #c62828; border: 1.5px solid #ef9a9a; }
+.btn--danger:hover { background: #ffcdd2; }
+.btn--gray     { background: #eceff1; color: #546e7a; }
+.btn--gray:hover { background: #cfd8dc; }

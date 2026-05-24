@@ -1,0 +1,218 @@
+import express from "express";
+import multer from "multer";
+import { v4 as uuidv4 } from "uuid";
+import fs from "fs";
+import fsp from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+const DATA_DIR    = path.join(__dirname, "data", "projects");
+const UPLOADS_DIR = path.join(__dirname, "uploads");
+
+fs.mkdirSync(DATA_DIR,    { recursive: true });
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+app.use(express.json());
+app.use("/uploads", express.static(UPLOADS_DIR));
+
+// ── ファイルアップロード設定 ────────────────────────────────
+const storage = multer.diskStorage({
+  destination(req, _file, cb) {
+    const dir = path.join(UPLOADS_DIR, req.params.projectId);
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename(req, _file, cb) {
+    cb(null, `${req.params.chapterId}.mp4`);
+  },
+});
+const upload = multer({ storage });
+
+const overlayStorage = multer.diskStorage({
+  destination(req, _file, cb) {
+    const dir = path.join(UPLOADS_DIR, req.params.id);
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename(_req, file, cb) {
+    const ext = path.extname(file.originalname).toLowerCase() || ".png";
+    cb(null, `overlay${ext}`);
+  },
+});
+const uploadOverlay = multer({ storage: overlayStorage });
+
+const endOverlayStorage = multer.diskStorage({
+  destination(req, _file, cb) {
+    const dir = path.join(UPLOADS_DIR, req.params.id);
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename(_req, file, cb) {
+    const ext = path.extname(file.originalname).toLowerCase() || ".png";
+    cb(null, `end_overlay${ext}`);
+  },
+});
+const uploadEndOverlay = multer({ storage: endOverlayStorage });
+
+// ── ヘルパー ───────────────────────────────────────────────
+const projectPath = (id) => path.join(DATA_DIR, `${id}.json`);
+
+async function readProject(id) {
+  return JSON.parse(await fsp.readFile(projectPath(id), "utf-8"));
+}
+
+async function writeProject(project) {
+  project.updatedAt = new Date().toISOString();
+  await fsp.writeFile(projectPath(project.id), JSON.stringify(project, null, 2));
+  return project;
+}
+
+// ── API ────────────────────────────────────────────────────
+
+// プロジェクト一覧
+app.get("/api/projects", async (_req, res) => {
+  try {
+    const files = (await fsp.readdir(DATA_DIR)).filter((f) => f.endsWith(".json"));
+    const list = await Promise.all(
+      files.map(async (f) => {
+        const p = JSON.parse(await fsp.readFile(path.join(DATA_DIR, f), "utf-8"));
+        return { id: p.id, name: p.company.name, updatedAt: p.updatedAt, chapterCount: p.chapters.length };
+      })
+    );
+    res.json(list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
+  } catch { res.json([]); }
+});
+
+// 新規プロジェクト作成
+app.post("/api/projects", async (_req, res) => {
+  const id = uuidv4().slice(0, 8);
+  const project = {
+    id,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    company: { name: "新しいプロジェクト", phone: "", contactUrl: "" },
+    theme: { primary: "#2a9824" },
+    chapters: [
+      { id: "C01", label: "オープニング",    url: null, demoDuration: 15 },
+      { id: "C02", label: "タイトル①",       url: null, demoDuration: 4  },
+      { id: "C03", label: "インタビュー①-1", url: null, demoDuration: 8  },
+      { id: "C04", label: "インタビュー①-2", url: null, demoDuration: 8  },
+      { id: "C05", label: "インタビュー①-3", url: null, demoDuration: 8  },
+      { id: "C06", label: "タイトル②",       url: null, demoDuration: 4  },
+      { id: "C07", label: "インタビュー②-1", url: null, demoDuration: 8  },
+      { id: "C08", label: "インタビュー②-2", url: null, demoDuration: 8  },
+      { id: "C09", label: "インタビュー②-3", url: null, demoDuration: 8  },
+      { id: "C10", label: "タイトル③",       url: null, demoDuration: 4  },
+      { id: "C11", label: "インタビュー③-1", url: null, demoDuration: 8  },
+      { id: "C12", label: "インタビュー③-2", url: null, demoDuration: 8  },
+      { id: "C13", label: "インタビュー③-3", url: null, demoDuration: 8  },
+      { id: "C14", label: "エンドメニュー",  url: null, demoDuration: 15 },
+    ],
+    flow: {
+      intro: { chapter: "C01", pauseAt: 15 },
+      branches: [
+        { id: "b1", label: "01 ブランチ名", sublabel: "Subtitle", chapters: ["C02","C03","C04","C05"] },
+        { id: "b2", label: "02 ブランチ名", sublabel: "Subtitle", chapters: ["C06","C07","C08","C09"] },
+        { id: "b3", label: "03 ブランチ名", sublabel: "Subtitle", chapters: ["C10","C11","C12","C13"] },
+      ],
+      endMenu: "C14",
+    },
+  };
+  res.json(await writeProject(project));
+});
+
+// プロジェクト取得
+app.get("/api/projects/:id", async (req, res) => {
+  try { res.json(await readProject(req.params.id)); }
+  catch { res.status(404).json({ error: "Not found" }); }
+});
+
+// プロジェクト更新
+app.put("/api/projects/:id", async (req, res) => {
+  try {
+    const existing = await readProject(req.params.id);
+    const updated = { ...existing, ...req.body, id: existing.id, createdAt: existing.createdAt };
+    res.json(await writeProject(updated));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// プロジェクト複製
+app.post("/api/projects/:id/duplicate", async (req, res) => {
+  try {
+    const src = await readProject(req.params.id);
+    const newId = uuidv4().slice(0, 8);
+    const copy = {
+      ...src,
+      id: newId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      company: { ...src.company, name: src.company.name + "（コピー）" },
+      // 動画URLはリセット（ファイルはコピーしない）
+      chapters: src.chapters.map((c) => ({ ...c, url: null })),
+    };
+    res.json(await writeProject(copy));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// プロジェクト削除
+app.delete("/api/projects/:id", async (req, res) => {
+  try {
+    await fsp.unlink(projectPath(req.params.id));
+    const uploadsDir = path.join(UPLOADS_DIR, req.params.id);
+    await fsp.rm(uploadsDir, { recursive: true, force: true });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// エンドオーバーレイ画像アップロード
+app.post("/api/projects/:id/upload/end-overlay",
+  uploadEndOverlay.single("image"),
+  async (req, res) => {
+    const { id } = req.params;
+    const url = `/uploads/${id}/${req.file.filename}`;
+    const project = await readProject(id);
+    if (!project.endOverlay) project.endOverlay = { imageUrl: url, buttons: [] };
+    else project.endOverlay.imageUrl = url;
+    await writeProject(project);
+    res.json({ url });
+  }
+);
+
+// オーバーレイ画像アップロード（動画ルートより先に定義すること）
+app.post("/api/projects/:id/upload/overlay",
+  uploadOverlay.single("image"),
+  async (req, res) => {
+    const { id } = req.params;
+    const url = `/uploads/${id}/${req.file.filename}`;
+    const project = await readProject(id);
+    if (!project.overlay) project.overlay = { imageUrl: url, buttons: [] };
+    else project.overlay.imageUrl = url;
+    await writeProject(project);
+    res.json({ url });
+  }
+);
+
+// 動画アップロード
+app.post("/api/projects/:projectId/upload/:chapterId",
+  upload.single("video"),
+  async (req, res) => {
+    const { projectId, chapterId } = req.params;
+    const url = `/uploads/${projectId}/${chapterId}.mp4`;
+    const project = await readProject(projectId);
+    const chapter = project.chapters.find((c) => c.id === chapterId);
+    if (chapter) chapter.url = url;
+    await writeProject(project);
+    res.json({ url });
+  }
+);
+
+// ── フロントエンド配信 ─────────────────────────────────────
+app.use(express.static(path.join(__dirname, "dist")));
+app.get("*", (_, res) => res.sendFile(path.join(__dirname, "dist", "index.html")));
+
+app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
