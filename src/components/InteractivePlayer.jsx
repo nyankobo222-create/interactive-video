@@ -18,26 +18,54 @@ function formatTime(s) {
 
 function SeekBar({ currentTime, duration, onSeek, canSeek, primaryColor }) {
   const trackRef = useRef();
+  const dragging = useRef(false);
 
   function getSeekTime(clientX) {
     const rect = trackRef.current.getBoundingClientRect();
     return Math.max(0, Math.min(duration, ((clientX - rect.left) / rect.width) * duration));
   }
 
+  function onMouseDown(e) {
+    if (!canSeek) return;
+    dragging.current = true;
+    onSeek(getSeekTime(e.clientX));
+  }
+  function onMouseMove(e) {
+    if (!dragging.current) return;
+    onSeek(getSeekTime(e.clientX));
+  }
+  function onMouseUp() { dragging.current = false; }
+
+  function onTouchStart(e) {
+    if (!canSeek) return;
+    dragging.current = true;
+    onSeek(getSeekTime(e.touches[0].clientX));
+  }
+  function onTouchMove(e) {
+    if (!dragging.current) return;
+    e.preventDefault();
+    onSeek(getSeekTime(e.touches[0].clientX));
+  }
+  function onTouchEnd() { dragging.current = false; }
+
   const pct = duration > 0 ? Math.min((currentTime / duration) * 100, 100) : 0;
 
   return (
-    <div className="seekbar">
+    <div
+      className="seekbar"
+      onMouseMove={onMouseMove}
+      onMouseUp={onMouseUp}
+      onMouseLeave={onMouseUp}
+    >
       <span className="seekbar__time">{formatTime(currentTime)}</span>
       <div
         ref={trackRef}
         className="seekbar__track"
         style={{ cursor: canSeek ? "pointer" : "default" }}
-        onClick={canSeek ? (e) => onSeek(getSeekTime(e.clientX)) : undefined}
-        onTouchEnd={canSeek ? (e) => {
-          e.preventDefault();
-          onSeek(getSeekTime(e.changedTouches[0].clientX));
-        } : undefined}
+        onMouseDown={onMouseDown}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
       >
         <div className="seekbar__fill" style={{ width: `${pct}%`, background: primaryColor }} />
         <div className="seekbar__thumb" style={{ left: `${pct}%`, background: primaryColor, opacity: canSeek ? 1 : 0 }} />

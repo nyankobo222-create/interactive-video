@@ -102,15 +102,17 @@
 .seekbar__thumb {
   position: absolute;
   top: 50%;
-  transform: translate(-50%, -50%) scale(0);
+  transform: translate(-50%, -50%) scale(1);
   width: 14px;
   height: 14px;
   border-radius: 50%;
   pointer-events: none;
-  transition: transform 0.15s;
   box-shadow: 0 1px 4px rgba(0,0,0,0.4);
 }
-.seekbar:hover .seekbar__thumb { transform: translate(-50%, -50%) scale(1); }
+@media (hover: hover) {
+  .seekbar__thumb { transform: translate(-50%, -50%) scale(0); transition: transform 0.15s; }
+  .seekbar:hover .seekbar__thumb { transform: translate(-50%, -50%) scale(1); }
+}
 
 /* ============================================================
    ビジュアルオーバーレイ（イラレUI画像 + ボタン領域）
