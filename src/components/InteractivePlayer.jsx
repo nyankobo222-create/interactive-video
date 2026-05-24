@@ -80,6 +80,43 @@ function requestFullscreen(el) {
   else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
 }
 
+function FullscreenBtn({ playerRef }) {
+  const [isFs, setIsFs] = useState(false);
+
+  useEffect(() => {
+    function onChange() {
+      setIsFs(!!document.fullscreenElement || !!document.webkitFullscreenElement);
+    }
+    document.addEventListener("fullscreenchange", onChange);
+    document.addEventListener("webkitfullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      document.removeEventListener("webkitfullscreenchange", onChange);
+    };
+  }, []);
+
+  function toggle() {
+    if (isFs) {
+      if (document.exitFullscreen) document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    } else {
+      requestFullscreen(playerRef.current);
+    }
+  }
+
+  return (
+    <button className="player__fs-btn" onClick={toggle} title={isFs ? "全画面解除" : "全画面"}>
+      {isFs ? "⛶" : "⛶"}
+      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+        {isFs
+          ? <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+          : <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+        }
+      </svg>
+    </button>
+  );
+}
+
 export default function InteractivePlayer({ config }) {
   const videoRef = useRef(null);
   const playerRef = useRef(null);
@@ -248,13 +285,16 @@ export default function InteractivePlayer({ config }) {
 
       {/* シークバー */}
       {started && (
-        <SeekBar
-          currentTime={playbackTime}
-          duration={duration}
-          onSeek={handleSeek}
-          canSeek={!isDemo}
-          primaryColor={config.theme.primary}
-        />
+        <div className="player__controls">
+          <SeekBar
+            currentTime={playbackTime}
+            duration={duration}
+            onSeek={handleSeek}
+            canSeek={!isDemo}
+            primaryColor={config.theme.primary}
+          />
+          <FullscreenBtn playerRef={playerRef} />
+        </div>
       )}
     </div>
   );
