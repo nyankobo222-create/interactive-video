@@ -93,23 +93,42 @@ function PlayPauseBtn({ isPlaying, onToggle, disabled }) {
   );
 }
 
-function requestFullscreen(el) {
-  if (el.requestFullscreen) el.requestFullscreen();
-  else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+function requestFullscreen(el, videoEl) {
+  if (el.requestFullscreen) {
+    el.requestFullscreen();
+  } else if (el.webkitRequestFullscreen) {
+    el.webkitRequestFullscreen();
+  } else if (videoEl && videoEl.webkitEnterFullscreen) {
+    // iOS Safari: div全画面は不可なのでvideo要素のネイティブ全画面を使う
+    videoEl.webkitEnterFullscreen();
+  }
 }
 
-function FullscreenBtn({ playerRef }) {
+function FullscreenBtn({ playerRef, videoRef }) {
   const [isFs, setIsFs] = useState(false);
 
   useEffect(() => {
     function onChange() {
       setIsFs(!!document.fullscreenElement || !!document.webkitFullscreenElement);
     }
+    // iOS Safari用: video要素のフルスクリーンイベント
+    function onIosBegin() { setIsFs(true); }
+    function onIosEnd()   { setIsFs(false); }
+
     document.addEventListener("fullscreenchange", onChange);
     document.addEventListener("webkitfullscreenchange", onChange);
+    const video = videoRef?.current;
+    if (video) {
+      video.addEventListener("webkitbeginfullscreen", onIosBegin);
+      video.addEventListener("webkitendfullscreen",   onIosEnd);
+    }
     return () => {
       document.removeEventListener("fullscreenchange", onChange);
       document.removeEventListener("webkitfullscreenchange", onChange);
+      if (video) {
+        video.removeEventListener("webkitbeginfullscreen", onIosBegin);
+        video.removeEventListener("webkitendfullscreen",   onIosEnd);
+      }
     };
   }, []);
 
@@ -117,8 +136,9 @@ function FullscreenBtn({ playerRef }) {
     if (isFs) {
       if (document.exitFullscreen) document.exitFullscreen();
       else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      else if (videoRef?.current?.webkitExitFullscreen) videoRef.current.webkitExitFullscreen();
     } else {
-      requestFullscreen(playerRef.current);
+      requestFullscreen(playerRef.current, videoRef?.current);
     }
   }
 
@@ -178,7 +198,7 @@ export default function InteractivePlayer({ config }) {
 
   function handleStart() {
     setStarted(true);
-    if (playerRef.current) requestFullscreen(playerRef.current);
+    if (playerRef.current) requestFullscreen(playerRef.current, videoRef.current);
     const ch = chaptersMap["C01"];
     if (ch?.url && videoRef.current) {
       videoRef.current.src = ch.url;
@@ -340,7 +360,7 @@ export default function InteractivePlayer({ config }) {
             canSeek={!isDemo}
             primaryColor={config.theme.primary}
           />
-          <FullscreenBtn playerRef={playerRef} />
+          <FullscreenBtn playerRef={playerRef} videoRef={videoRef} />
         </div>
       )}
     </div>
