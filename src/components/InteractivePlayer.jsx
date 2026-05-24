@@ -34,6 +34,10 @@ function SeekBar({ currentTime, duration, onSeek, canSeek, primaryColor }) {
         className="seekbar__track"
         style={{ cursor: canSeek ? "pointer" : "default" }}
         onClick={canSeek ? (e) => onSeek(getSeekTime(e.clientX)) : undefined}
+        onTouchEnd={canSeek ? (e) => {
+          e.preventDefault();
+          onSeek(getSeekTime(e.changedTouches[0].clientX));
+        } : undefined}
       >
         <div className="seekbar__fill" style={{ width: `${pct}%`, background: primaryColor }} />
         <div className="seekbar__thumb" style={{ left: `${pct}%`, background: primaryColor, opacity: canSeek ? 1 : 0 }} />
