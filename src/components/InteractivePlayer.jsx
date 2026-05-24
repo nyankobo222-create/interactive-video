@@ -47,8 +47,14 @@ function SeekBar({ currentTime, duration, onSeek, canSeek, primaryColor }) {
   );
 }
 
+function requestFullscreen(el) {
+  if (el.requestFullscreen) el.requestFullscreen();
+  else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+}
+
 export default function InteractivePlayer({ config }) {
   const videoRef = useRef(null);
+  const playerRef = useRef(null);
   const [phase, setPhase] = useState("intro");
   const [currentId, setCurrentId] = useState("C01");
   const [queue, setQueue] = useState([]);
@@ -88,6 +94,7 @@ export default function InteractivePlayer({ config }) {
 
   function handleStart() {
     setStarted(true);
+    if (playerRef.current) requestFullscreen(playerRef.current);
     const ch = chaptersMap["C01"];
     if (ch?.url && videoRef.current) {
       videoRef.current.src = ch.url;
@@ -152,7 +159,7 @@ export default function InteractivePlayer({ config }) {
   }, [switchChapter]);
 
   return (
-    <div className="player" style={{ aspectRatio }}>
+    <div ref={playerRef} className="player" style={{ aspectRatio }}>
       {/* 動画レイヤー */}
       {isDemo ? (
         <DemoChapter
