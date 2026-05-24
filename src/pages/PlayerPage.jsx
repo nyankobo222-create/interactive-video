@@ -27,11 +27,8 @@ export default function PlayerPage() {
   );
 
   return (
-    <div style={{ background: "#111", minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, padding: "12px" }}>
+    <div style={{ background: "#111", minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", padding: "12px" }}>
       <InteractivePlayer config={config} />
-      <Link to={`/admin/${id}`} style={{ color: "#90a4ae", fontSize: "0.82rem" }}>
-        ← 管理画面に戻る
-      </Link>
     </div>
   );
 }
