@@ -7,6 +7,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import crypto from "crypto";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -20,6 +21,31 @@ fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 app.use(express.json());
 app.use("/uploads", express.static(UPLOADS_DIR));
+
+// ── Cloudflare R2 ──────────────────────────────────────────
+const R2_ACCOUNT_ID = "6e9a6b53e185412fea8e54ac27686b26";
+const R2_BUCKET     = "interactive-video";
+const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || "";
+const useR2 = !!(process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY);
+
+const r2 = useR2 ? new S3Client({
+  region: "auto",
+  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
+}) : null;
+
+async function uploadToR2(key, buffer, contentType) {
+  await r2.send(new PutObjectCommand({
+    Bucket: R2_BUCKET,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+  }));
+  return `${R2_PUBLIC_URL}/${key}`;
+}
 
 // ── 認証 ──────────────────────────────────────────────────
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
@@ -42,43 +68,10 @@ function requireAuth(req, res, next) {
 app.use("/api/projects", requireAuth);
 
 // ── ファイルアップロード設定 ────────────────────────────────
-const storage = multer.diskStorage({
-  destination(req, _file, cb) {
-    const dir = path.join(UPLOADS_DIR, req.params.projectId);
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename(req, _file, cb) {
-    cb(null, `${req.params.chapterId}.mp4`);
-  },
-});
-const upload = multer({ storage });
-
-const overlayStorage = multer.diskStorage({
-  destination(req, _file, cb) {
-    const dir = path.join(UPLOADS_DIR, req.params.id);
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename(_req, file, cb) {
-    const ext = path.extname(file.originalname).toLowerCase() || ".png";
-    cb(null, `overlay${ext}`);
-  },
-});
-const uploadOverlay = multer({ storage: overlayStorage });
-
-const endOverlayStorage = multer.diskStorage({
-  destination(req, _file, cb) {
-    const dir = path.join(UPLOADS_DIR, req.params.id);
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename(_req, file, cb) {
-    const ext = path.extname(file.originalname).toLowerCase() || ".png";
-    cb(null, `end_overlay${ext}`);
-  },
-});
-const uploadEndOverlay = multer({ storage: endOverlayStorage });
+const memStorage = multer.memoryStorage();
+const upload        = multer({ storage: memStorage });
+const uploadOverlay    = multer({ storage: memStorage });
+const uploadEndOverlay = multer({ storage: memStorage });
 
 // ── ヘルパー ───────────────────────────────────────────────
 const projectPath = (id) => path.join(DATA_DIR, `${id}.json`);
@@ -195,7 +188,17 @@ app.post("/api/projects/:id/upload/end-overlay",
   uploadEndOverlay.single("image"),
   async (req, res) => {
     const { id } = req.params;
-    const url = `/uploads/${id}/${req.file.filename}`;
+    const ext = path.extname(req.file.originalname).toLowerCase() || ".png";
+    const key = `${id}/end_overlay${ext}`;
+    let url;
+    if (useR2) {
+      url = await uploadToR2(key, req.file.buffer, req.file.mimetype || "image/png");
+    } else {
+      const dir = path.join(UPLOADS_DIR, id);
+      fs.mkdirSync(dir, { recursive: true });
+      await fsp.writeFile(path.join(dir, `end_overlay${ext}`), req.file.buffer);
+      url = `/uploads/${key}`;
+    }
     const project = await readProject(id);
     if (!project.endOverlay) project.endOverlay = { imageUrl: url, buttons: [] };
     else project.endOverlay.imageUrl = url;
@@ -209,7 +212,17 @@ app.post("/api/projects/:id/upload/overlay",
   uploadOverlay.single("image"),
   async (req, res) => {
     const { id } = req.params;
-    const url = `/uploads/${id}/${req.file.filename}`;
+    const ext = path.extname(req.file.originalname).toLowerCase() || ".png";
+    const key = `${id}/overlay${ext}`;
+    let url;
+    if (useR2) {
+      url = await uploadToR2(key, req.file.buffer, req.file.mimetype || "image/png");
+    } else {
+      const dir = path.join(UPLOADS_DIR, id);
+      fs.mkdirSync(dir, { recursive: true });
+      await fsp.writeFile(path.join(dir, `overlay${ext}`), req.file.buffer);
+      url = `/uploads/${key}`;
+    }
     const project = await readProject(id);
     if (!project.overlay) project.overlay = { imageUrl: url, buttons: [] };
     else project.overlay.imageUrl = url;
@@ -223,7 +236,16 @@ app.post("/api/projects/:projectId/upload/:chapterId",
   upload.single("video"),
   async (req, res) => {
     const { projectId, chapterId } = req.params;
-    const url = `/uploads/${projectId}/${chapterId}.mp4`;
+    const key = `${projectId}/${chapterId}.mp4`;
+    let url;
+    if (useR2) {
+      url = await uploadToR2(key, req.file.buffer, req.file.mimetype || "video/mp4");
+    } else {
+      const dir = path.join(UPLOADS_DIR, projectId);
+      fs.mkdirSync(dir, { recursive: true });
+      await fsp.writeFile(path.join(dir, `${chapterId}.mp4`), req.file.buffer);
+      url = `/uploads/${key}`;
+    }
     const project = await readProject(projectId);
     const chapter = project.chapters.find((c) => c.id === chapterId);
     if (chapter) chapter.url = url;
