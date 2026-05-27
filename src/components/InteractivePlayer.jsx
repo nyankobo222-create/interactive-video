@@ -6,15 +6,15 @@ import VisualOverlay from "./VisualOverlay";
 import { useAnalytics } from "../hooks/useAnalytics";
 import "./InteractivePlayer.css";
 
-// phase の状態遷移:
-// "intro"         C01再生中
-// "branch_select" C01が15秒で停止、ブランチ選択オーバーレイ表示
-// "branch_playing" 選択したブランチのチャプターを再生中、ボトムバー表示
-// "end_menu"      C14に到達、エンドメニューオーバーレイ表示
-
 function formatTime(s) {
   const m = Math.floor(s / 60);
   return `${m}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
+}
+
+// iPad(iOS13+)はnavigator.platformが"MacIntel"かつmaxTouchPoints>1
+function isIOS() {
+  return /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 
 function SeekBar({ currentTime, duration, onSeek, canSeek, primaryColor }) {
@@ -94,58 +94,48 @@ function PlayPauseBtn({ isPlaying, onToggle, disabled }) {
   );
 }
 
-function requestFullscreen(el, videoEl) {
-  if (el.requestFullscreen) {
-    el.requestFullscreen();
-  } else if (el.webkitRequestFullscreen) {
-    el.webkitRequestFullscreen();
-  } else if (videoEl && videoEl.webkitEnterFullscreen) {
-    // iOS Safari: div全画面は不可なのでvideo要素のネイティブ全画面を使う
-    videoEl.webkitEnterFullscreen();
-  }
-}
-
-function FullscreenBtn({ playerRef, videoRef }) {
-  const [isFs, setIsFs] = useState(false);
+// isFakeFs: iOSの擬似フルスクリーン中かどうか
+// onEnterFakeFs / onExitFakeFs: 擬似フルスクリーンの制御コールバック
+function FullscreenBtn({ playerRef, videoRef, isFakeFs, onEnterFakeFs, onExitFakeFs }) {
+  const [isRealFs, setIsRealFs] = useState(false);
 
   useEffect(() => {
     function onChange() {
-      setIsFs(!!document.fullscreenElement || !!document.webkitFullscreenElement);
+      setIsRealFs(!!document.fullscreenElement || !!document.webkitFullscreenElement);
     }
-    // iOS Safari用: video要素のフルスクリーンイベント
-    function onIosBegin() { setIsFs(true); }
-    function onIosEnd()   { setIsFs(false); }
-
     document.addEventListener("fullscreenchange", onChange);
     document.addEventListener("webkitfullscreenchange", onChange);
-    const video = videoRef?.current;
-    if (video) {
-      video.addEventListener("webkitbeginfullscreen", onIosBegin);
-      video.addEventListener("webkitendfullscreen",   onIosEnd);
-    }
     return () => {
       document.removeEventListener("fullscreenchange", onChange);
       document.removeEventListener("webkitfullscreenchange", onChange);
-      if (video) {
-        video.removeEventListener("webkitbeginfullscreen", onIosBegin);
-        video.removeEventListener("webkitendfullscreen",   onIosEnd);
-      }
     };
   }, []);
 
+  const isFs = isRealFs || isFakeFs;
+
   function toggle() {
-    if (isFs) {
+    if (isRealFs) {
       if (document.exitFullscreen) document.exitFullscreen();
       else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-      else if (videoRef?.current?.webkitExitFullscreen) videoRef.current.webkitExitFullscreen();
+    } else if (isFakeFs) {
+      onExitFakeFs();
+    } else if (isIOS()) {
+      // iOSはFullscreen API非対応のため擬似フルスクリーンを使用
+      onEnterFakeFs();
     } else {
-      requestFullscreen(playerRef.current, videoRef?.current);
+      const el = playerRef.current;
+      if (el.requestFullscreen) {
+        el.requestFullscreen().catch(onEnterFakeFs);
+      } else if (el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
+      } else {
+        onEnterFakeFs();
+      }
     }
   }
 
   return (
     <button className="player__fs-btn" onClick={toggle} title={isFs ? "全画面解除" : "全画面"}>
-      {isFs ? "⛶" : "⛶"}
       <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
         {isFs
           ? <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
@@ -167,6 +157,7 @@ export default function InteractivePlayer({ config }) {
   const [playbackTime, setPlaybackTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isFakeFs, setIsFakeFs] = useState(false);
 
   const { send, elapsed } = useAnalytics(config.id);
   const selectedBranchRef = useRef(null);
@@ -183,6 +174,28 @@ export default function InteractivePlayer({ config }) {
     setPlaybackTime(0);
     if (isDemo && chapter) setDuration(chapter.demoDuration ?? 0);
   }, [currentId]);
+
+  // 擬似フルスクリーン: position:fixed でビューポート全体を覆う
+  function enterFakeFs() {
+    window.scrollTo(0, 1); // アドレスバーを引っ込める
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    setIsFakeFs(true);
+  }
+
+  function exitFakeFs() {
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+    setIsFakeFs(false);
+  }
+
+  // アンマウント時にbodyのoverflowを元に戻す
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    };
+  }, []);
 
   const switchChapter = useCallback((id, nextQueue) => {
     setCurrentId(id);
@@ -203,7 +216,16 @@ export default function InteractivePlayer({ config }) {
   function handleStart() {
     setStarted(true);
     send("play_start");
-    if (playerRef.current) requestFullscreen(playerRef.current, videoRef.current);
+
+    // iOSは擬似フルスクリーン、それ以外はネイティブFullscreen API
+    if (isIOS()) {
+      enterFakeFs();
+    } else if (playerRef.current?.requestFullscreen) {
+      playerRef.current.requestFullscreen().catch(() => {});
+    } else if (playerRef.current?.webkitRequestFullscreen) {
+      playerRef.current.webkitRequestFullscreen();
+    }
+
     const ch = chaptersMap["C01"];
     if (ch?.url && videoRef.current) {
       videoRef.current.src = ch.url;
@@ -296,7 +318,11 @@ export default function InteractivePlayer({ config }) {
   }, [switchChapter, send]);
 
   return (
-    <div ref={playerRef} className="player" style={{ aspectRatio }}>
+    <div
+      ref={playerRef}
+      className={`player${isFakeFs ? " player--fakescreen" : ""}`}
+      style={isFakeFs ? undefined : { aspectRatio }}
+    >
       {/* 動画レイヤー */}
       {isDemo ? (
         <DemoChapter
@@ -370,7 +396,13 @@ export default function InteractivePlayer({ config }) {
             canSeek={!isDemo}
             primaryColor={config.theme.primary}
           />
-          <FullscreenBtn playerRef={playerRef} videoRef={videoRef} />
+          <FullscreenBtn
+            playerRef={playerRef}
+            videoRef={videoRef}
+            isFakeFs={isFakeFs}
+            onEnterFakeFs={enterFakeFs}
+            onExitFakeFs={exitFakeFs}
+          />
         </div>
       )}
     </div>
