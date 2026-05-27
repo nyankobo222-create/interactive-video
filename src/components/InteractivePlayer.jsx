@@ -17,6 +17,12 @@ function isIOS() {
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 
+// iframeの中かどうかを判定
+function isInIframe() {
+  try { return window.self !== window.top; }
+  catch { return true; }
+}
+
 function SeekBar({ currentTime, duration, onSeek, canSeek, primaryColor }) {
   const trackRef = useRef();
   const dragging = useRef(false);
@@ -176,16 +182,23 @@ export default function InteractivePlayer({ config }) {
   }, [currentId]);
 
   // 擬似フルスクリーン: position:fixed でビューポート全体を覆う
+  // iframe内では親ページにpostMessageを送ってiframe自体を全画面拡大してもらう
   function enterFakeFs() {
-    window.scrollTo(0, 1); // アドレスバーを引っ込める
+    window.scrollTo(0, 1);
     document.body.style.overflow = "hidden";
     document.documentElement.style.overflow = "hidden";
+    if (isInIframe()) {
+      window.parent.postMessage({ type: "iv-fullscreen-enter" }, "*");
+    }
     setIsFakeFs(true);
   }
 
   function exitFakeFs() {
     document.body.style.overflow = "";
     document.documentElement.style.overflow = "";
+    if (isInIframe()) {
+      window.parent.postMessage({ type: "iv-fullscreen-exit" }, "*");
+    }
     setIsFakeFs(false);
   }
 
