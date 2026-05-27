@@ -3,6 +3,7 @@ import AdminHome from "./pages/AdminHome";
 import ProjectEditor from "./pages/ProjectEditor";
 import PlayerPage from "./pages/PlayerPage";
 import LoginPage from "./pages/LoginPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
 import { getToken } from "./auth";
 
 function RequireAuth({ children }) {
@@ -19,8 +20,9 @@ export default function App() {
       <Route path="/"              element={<Navigate to="/admin" replace />} />
       <Route path="/admin/login"   element={<LoginPage />} />
       <Route path="/admin"         element={<RequireAuth><AdminHome /></RequireAuth>} />
-      <Route path="/admin/:id"     element={<RequireAuth><ProjectEditor /></RequireAuth>} />
-      <Route path="/play/:id"      element={<PlayerPage />} />
+      <Route path="/admin/:id"            element={<RequireAuth><ProjectEditor /></RequireAuth>} />
+      <Route path="/admin/:id/analytics" element={<RequireAuth><AnalyticsPage /></RequireAuth>} />
+      <Route path="/play/:id"             element={<PlayerPage />} />
     </Routes>
   );
 }

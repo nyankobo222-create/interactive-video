@@ -13,11 +13,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const DATA_DIR    = path.join(__dirname, "uploads", "data", "projects");
-const UPLOADS_DIR = path.join(__dirname, "uploads");
+const DATA_DIR      = path.join(__dirname, "uploads", "data", "projects");
+const ANALYTICS_DIR = path.join(__dirname, "uploads", "data", "analytics");
+const UPLOADS_DIR   = path.join(__dirname, "uploads");
 
-fs.mkdirSync(DATA_DIR,    { recursive: true });
-fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+fs.mkdirSync(DATA_DIR,      { recursive: true });
+fs.mkdirSync(ANALYTICS_DIR, { recursive: true });
+fs.mkdirSync(UPLOADS_DIR,   { recursive: true });
 
 app.use(express.json());
 app.use("/uploads", express.static(UPLOADS_DIR));
@@ -254,6 +256,86 @@ app.post("/api/projects/:projectId/upload/:chapterId",
     res.json({ url });
   }
 );
+
+// ── アナリティクス ─────────────────────────────────────────
+
+const analyticsPath = (id) => path.join(ANALYTICS_DIR, `${id}.json`);
+
+async function readAnalytics(id) {
+  try {
+    return JSON.parse(await fsp.readFile(analyticsPath(id), "utf-8"));
+  } catch {
+    return { events: [] };
+  }
+}
+
+// イベント記録（認証不要・プレーヤーから送信）
+app.post("/api/analytics/:id/event", async (req, res) => {
+  const { id } = req.params;
+  const event = req.body;
+  if (!event.type || !event.sessionId) return res.status(400).json({ error: "Invalid" });
+  const data = await readAnalytics(id);
+  data.events.push(event);
+  await fsp.writeFile(analyticsPath(id), JSON.stringify(data));
+  res.json({ ok: true });
+});
+
+// 分析サマリー取得（管理画面用・認証必要）
+app.get("/api/analytics/:id", requireAuth, async (req, res) => {
+  const data = await readAnalytics(req.params.id);
+  const events = data.events;
+
+  // セッション別集計
+  const sessions = {};
+  for (const e of events) {
+    if (!sessions[e.sessionId]) sessions[e.sessionId] = [];
+    sessions[e.sessionId].push(e);
+  }
+
+  const totalSessions = Object.keys(sessions).length;
+  const completedSessions = Object.values(sessions).filter(
+    (s) => s.some((e) => e.type === "end_reached")
+  ).length;
+  const completionRate = totalSessions > 0
+    ? Math.round((completedSessions / totalSessions) * 100) : 0;
+
+  // ブランチ選択集計
+  const branchMap = {};
+  for (const e of events) {
+    if (e.type !== "branch_select") continue;
+    if (!branchMap[e.branchId]) branchMap[e.branchId] = { label: e.branchLabel, count: 0 };
+    branchMap[e.branchId].count++;
+  }
+  const totalBranchSelects = Object.values(branchMap).reduce((s, b) => s + b.count, 0);
+  const branchCounts = Object.entries(branchMap).map(([id, { label, count }]) => ({
+    id, label, count,
+    rate: totalBranchSelects > 0 ? Math.round((count / totalBranchSelects) * 100) : 0,
+  }));
+
+  // 日別視聴数（過去30日）
+  const dailyMap = {};
+  for (const e of events) {
+    if (e.type !== "play_start") continue;
+    const date = e.timestamp.slice(0, 10);
+    dailyMap[date] = (dailyMap[date] || 0) + 1;
+  }
+  const dailyCounts = Object.entries(dailyMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-30)
+    .map(([date, count]) => ({ date, count }));
+
+  // トップ戻り回数
+  const topReturnCount = events.filter((e) => e.type === "top_return").length;
+
+  res.json({
+    totalSessions,
+    completedSessions,
+    completionRate,
+    topReturnCount,
+    branchCounts,
+    dailyCounts,
+  });
+});
 
 // ── フロントエンド配信 ─────────────────────────────────────
 app.use(express.static(path.join(__dirname, "dist")));

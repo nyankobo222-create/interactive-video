@@ -3,6 +3,7 @@ import BranchMenu from "./BranchMenu";
 import BottomBar from "./BottomBar";
 import DemoChapter from "./DemoChapter";
 import VisualOverlay from "./VisualOverlay";
+import { useAnalytics } from "../hooks/useAnalytics";
 import "./InteractivePlayer.css";
 
 // phase の状態遷移:
@@ -167,6 +168,9 @@ export default function InteractivePlayer({ config }) {
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
+  const { send, elapsed } = useAnalytics(config.id);
+  const selectedBranchRef = useRef(null);
+
   const chaptersMap = Array.isArray(config.chapters)
     ? Object.fromEntries(config.chapters.map((c) => [c.id, c]))
     : config.chapters;
@@ -198,6 +202,7 @@ export default function InteractivePlayer({ config }) {
 
   function handleStart() {
     setStarted(true);
+    send("play_start");
     if (playerRef.current) requestFullscreen(playerRef.current, videoRef.current);
     const ch = chaptersMap["C01"];
     if (ch?.url && videoRef.current) {
@@ -260,6 +265,7 @@ export default function InteractivePlayer({ config }) {
     if (phase === "end_menu") return;
 
     if (queue.length === 0) {
+      send("end_reached", { branchId: selectedBranchRef.current?.id, totalTime: elapsed() });
       setPhase("end_menu");
       switchChapter(config.flow.endMenu, []);
       return;
@@ -267,23 +273,27 @@ export default function InteractivePlayer({ config }) {
 
     const [next, ...rest] = queue;
     if (next === config.flow.endMenu) {
+      send("end_reached", { branchId: selectedBranchRef.current?.id, totalTime: elapsed() });
       setPhase("end_menu");
       switchChapter(next, []);
     } else {
       switchChapter(next, rest);
     }
-  }, [currentId, phase, queue, config, switchChapter]);
+  }, [currentId, phase, queue, config, switchChapter, send, elapsed]);
 
   const handleBranchSelect = useCallback((branch) => {
+    selectedBranchRef.current = branch;
+    send("branch_select", { branchId: branch.id, branchLabel: branch.label });
     const [first, ...rest] = branch.chapters;
     setPhase("branch_playing");
     switchChapter(first, [...rest, config.flow.endMenu]);
-  }, [config, switchChapter]);
+  }, [config, switchChapter, send]);
 
   const handleGoTop = useCallback(() => {
+    send("top_return");
     setPhase("intro");
     switchChapter("C01", []);
-  }, [switchChapter]);
+  }, [switchChapter, send]);
 
   return (
     <div ref={playerRef} className="player" style={{ aspectRatio }}>

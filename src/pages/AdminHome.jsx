@@ -69,6 +69,9 @@ export default function AdminHome() {
                 <a className="btn btn--outline btn--sm" href={`/play/${p.id}`} target="_blank" rel="noreferrer">
                   プレビュー
                 </a>
+                <button className="btn btn--outline btn--sm" onClick={() => nav(`/admin/${p.id}/analytics`)}>
+                  分析
+                </button>
                 <button className="btn btn--gray btn--sm" onClick={() => duplicateProject(p.id)}>
                   複製
                 </button>
