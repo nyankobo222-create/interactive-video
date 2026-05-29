@@ -294,3 +294,169 @@
   accent-color: #2a9824;
   cursor: pointer;
 }
+
+/* ── ビジュアルエディター チャプター選択 ── */
+.ve-target-selector { margin-bottom: 4px; }
+.ve-target-selector__hint {
+  font-size: 0.83rem;
+  color: #e65100;
+  margin-top: 6px;
+  background: #fff3e0;
+  border-radius: 4px;
+  padding: 6px 10px;
+}
+
+/* ── チャプターごとの分岐設定 ── */
+.chapter-branch-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+
+.chapter-branch-section {
+  background: #fff;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.chapter-branch-section--active {
+  border-color: #a5d6a7;
+}
+
+.chapter-branch-section__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  cursor: pointer;
+  user-select: none;
+  background: #fafafa;
+}
+.chapter-branch-section--active .chapter-branch-section__header {
+  background: #f1f8f1;
+}
+.chapter-branch-section__header:hover { background: #f0f4f0; }
+
+.chapter-branch-section__toggle {
+  font-size: 0.7rem;
+  color: #90a4ae;
+  width: 14px;
+}
+.chapter-branch-section__id {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  background: #546e7a;
+  padding: 2px 7px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.chapter-branch-section--active .chapter-branch-section__id {
+  background: #2a9824;
+}
+.chapter-branch-section__label {
+  flex: 1;
+  font-size: 0.9rem;
+  color: #37474f;
+}
+.chapter-branch-section__badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #2a9824;
+  background: #e8f5e9;
+  padding: 2px 8px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.chapter-branch-section__next-badge {
+  font-size: 0.75rem;
+  color: #78909c;
+  background: #eceff1;
+  padding: 2px 8px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.chapter-branch-section__body {
+  padding: 14px 16px;
+  border-top: 1px solid #e0e0e0;
+  background: #fff;
+}
+.chapter-branch-section__row {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+/* 分岐行（v2） */
+.branch-row__next-select { min-width: 140px; max-width: 180px; flex-shrink: 0; }
+
+/* ════════════════════════════════════════════
+   レスポンシブ対応
+   ════════════════════════════════════════════ */
+
+/* ── タブレット（〜768px） ── */
+@media (max-width: 768px) {
+  .editor__content { padding: 20px 16px; }
+  .ve-layout { flex-direction: column; }
+  .ve-panel { width: 100%; }
+  .ve-section { max-width: 100%; }
+}
+
+/* ── スマートフォン（〜600px） ── */
+@media (max-width: 600px) {
+
+  /* トップバー */
+  .editor__topbar { padding: 10px 14px; gap: 8px; }
+  .editor__title { font-size: 0.88rem; }
+  .editor__back { font-size: 0.78rem; }
+  .editor__topbar-right { gap: 6px; }
+  .editor__topbar-right .btn--sm { padding: 5px 10px; font-size: 0.75rem; }
+
+  /* タブ：スクロール可能に */
+  .editor__tabs {
+    padding: 0 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .editor__tabs::-webkit-scrollbar { display: none; }
+  .editor__tab { padding: 12px 14px; font-size: 0.8rem; white-space: nowrap; }
+
+  /* コンテンツ */
+  .editor__content { padding: 16px 12px; }
+  .editor__section { max-width: 100%; }
+  .editor__section-title { font-size: 1rem; }
+
+  /* フォームグリッド：1カラム */
+  .form-grid { grid-template-columns: 1fr; gap: 14px; }
+  .form-grid > * { grid-column: auto !important; }
+
+  /* プレイヤーURLボックス */
+  .player-url-box__row { flex-wrap: wrap; }
+  .player-url-box__input { min-width: 0; }
+
+  /* チャプター行 */
+  .chapter-row__top { flex-wrap: wrap; }
+  .chapter-row__label { min-width: 0; }
+  .chapter-row__bottom { gap: 8px; }
+
+  /* 分岐設定タブ */
+  .chapter-branch-section__header { gap: 7px; padding: 10px 12px; }
+  .chapter-branch-section__label { font-size: 0.85rem; }
+  .chapter-branch-section__body { padding: 12px; }
+  .chapter-branch-section__row { flex-direction: column; gap: 14px; }
+
+  /* 分岐行 */
+  .branch-row { padding: 12px; }
+  .branch-row__header { flex-direction: column; align-items: stretch; gap: 8px; }
+  .branch-row__label,
+  .branch-row__sublabel { width: 100%; }
+  .branch-row__next-select { max-width: 100%; }
+  .branch-row__header .btn-icon { align-self: flex-end; }
+
+  /* ビジュアルエディター */
+  .ve-layout { flex-direction: column; gap: 14px; }
+  .ve-panel { width: 100%; box-sizing: border-box; }
+  .ve-empty { height: 180px; font-size: 0.9rem; }
+  .ve-target-selector .form-input { max-width: 100% !important; }
+  .editor__section-header { flex-wrap: wrap; gap: 8px; }
+  .editor__section-header h2 { flex: 1 1 100%; }
+}

@@ -80,13 +80,65 @@ const uploadEndOverlay = multer({ storage: memStorage });
 const projectPath = (id) => path.join(DATA_DIR, `${id}.json`);
 
 async function readProject(id) {
-  return JSON.parse(await fsp.readFile(projectPath(id), "utf-8"));
+  return migrateToV2(JSON.parse(await fsp.readFile(projectPath(id), "utf-8")));
 }
 
 async function writeProject(project) {
   project.updatedAt = new Date().toISOString();
   await fsp.writeFile(projectPath(project.id), JSON.stringify(project, null, 2));
   return project;
+}
+
+// ── v1 → v2 マイグレーション ───────────────────────────────
+function migrateToV2(project) {
+  if (project.schemaVersion === 2) return project;
+
+  const chaptersById = {};
+  (project.chapters || []).forEach((c) => {
+    chaptersById[c.id] = {
+      ...c,
+      branches: c.branches || [],
+      overlay: c.overlay || null,
+      nextChapterId: c.nextChapterId || null,
+      pauseAt: c.pauseAt ?? null,
+    };
+  });
+
+  const introId = project.flow?.intro?.chapter || "C01";
+  if (chaptersById[introId]) {
+    if (project.flow?.intro?.pauseAt != null) {
+      chaptersById[introId].pauseAt = project.flow.intro.pauseAt;
+    }
+    if (project.overlay && !chaptersById[introId].overlay) {
+      chaptersById[introId].overlay = project.overlay;
+    }
+    if (project.flow?.branches?.length > 0 && !chaptersById[introId].branches?.length) {
+      chaptersById[introId].branches = project.flow.branches.map((b) => ({
+        id: b.id,
+        label: b.label || "",
+        sublabel: b.sublabel || "",
+        nextChapterId: b.chapters?.[0] ?? null,
+      }));
+      project.flow.branches.forEach((b) => {
+        if (!b.chapters) return;
+        for (let i = 0; i < b.chapters.length - 1; i++) {
+          const curr = b.chapters[i];
+          const next = b.chapters[i + 1];
+          if (chaptersById[curr] && !chaptersById[curr].nextChapterId) {
+            chaptersById[curr].nextChapterId = next;
+          }
+        }
+      });
+    }
+  }
+
+  const { overlay: _dropped, ...rest } = project;
+  return {
+    ...rest,
+    schemaVersion: 2,
+    chapters: (project.chapters || []).map((c) => chaptersById[c.id] || c),
+    flow: { endMenu: project.flow?.endMenu ?? null },
+  };
 }
 
 // ── API ────────────────────────────────────────────────────
@@ -108,37 +160,42 @@ app.get("/api/projects", requireAuth, async (_req, res) => {
 // 新規プロジェクト作成
 app.post("/api/projects", requireAuth, async (_req, res) => {
   const id = uuidv4().slice(0, 8);
+  const ch = (id, label, dur, extra = {}) => ({
+    id, label, url: null, demoDuration: dur,
+    pauseAt: null, overlay: null, branches: [], nextChapterId: null,
+    ...extra,
+  });
   const project = {
     id,
+    schemaVersion: 2,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     company: { name: "新しいプロジェクト", phone: "", contactUrl: "" },
     theme: { primary: "#2a9824" },
     chapters: [
-      { id: "C01", label: "オープニング",    url: null, demoDuration: 15 },
-      { id: "C02", label: "タイトル①",       url: null, demoDuration: 4  },
-      { id: "C03", label: "インタビュー①-1", url: null, demoDuration: 8  },
-      { id: "C04", label: "インタビュー①-2", url: null, demoDuration: 8  },
-      { id: "C05", label: "インタビュー①-3", url: null, demoDuration: 8  },
-      { id: "C06", label: "タイトル②",       url: null, demoDuration: 4  },
-      { id: "C07", label: "インタビュー②-1", url: null, demoDuration: 8  },
-      { id: "C08", label: "インタビュー②-2", url: null, demoDuration: 8  },
-      { id: "C09", label: "インタビュー②-3", url: null, demoDuration: 8  },
-      { id: "C10", label: "タイトル③",       url: null, demoDuration: 4  },
-      { id: "C11", label: "インタビュー③-1", url: null, demoDuration: 8  },
-      { id: "C12", label: "インタビュー③-2", url: null, demoDuration: 8  },
-      { id: "C13", label: "インタビュー③-3", url: null, demoDuration: 8  },
-      { id: "C14", label: "エンドメニュー",  url: null, demoDuration: 15 },
+      ch("C01", "オープニング",    15, {
+        pauseAt: 15,
+        branches: [
+          { id: "b1", label: "01 ブランチ名", sublabel: "Subtitle", nextChapterId: "C02" },
+          { id: "b2", label: "02 ブランチ名", sublabel: "Subtitle", nextChapterId: "C06" },
+          { id: "b3", label: "03 ブランチ名", sublabel: "Subtitle", nextChapterId: "C10" },
+        ],
+      }),
+      ch("C02", "タイトル①",        4, { nextChapterId: "C03" }),
+      ch("C03", "インタビュー①-1",  8, { nextChapterId: "C04" }),
+      ch("C04", "インタビュー①-2",  8, { nextChapterId: "C05" }),
+      ch("C05", "インタビュー①-3",  8),
+      ch("C06", "タイトル②",        4, { nextChapterId: "C07" }),
+      ch("C07", "インタビュー②-1",  8, { nextChapterId: "C08" }),
+      ch("C08", "インタビュー②-2",  8, { nextChapterId: "C09" }),
+      ch("C09", "インタビュー②-3",  8),
+      ch("C10", "タイトル③",        4, { nextChapterId: "C11" }),
+      ch("C11", "インタビュー③-1",  8, { nextChapterId: "C12" }),
+      ch("C12", "インタビュー③-2",  8, { nextChapterId: "C13" }),
+      ch("C13", "インタビュー③-3",  8),
+      ch("C14", "エンドメニュー",   15),
     ],
-    flow: {
-      intro: { chapter: "C01", pauseAt: 15 },
-      branches: [
-        { id: "b1", label: "01 ブランチ名", sublabel: "Subtitle", chapters: ["C02","C03","C04","C05"] },
-        { id: "b2", label: "02 ブランチ名", sublabel: "Subtitle", chapters: ["C06","C07","C08","C09"] },
-        { id: "b3", label: "03 ブランチ名", sublabel: "Subtitle", chapters: ["C10","C11","C12","C13"] },
-      ],
-      endMenu: "C14",
-    },
+    flow: { endMenu: "C14" },
   };
   res.json(await writeProject(project));
 });
@@ -229,6 +286,32 @@ app.post("/api/projects/:id/upload/overlay",
     const project = await readProject(id);
     if (!project.overlay) project.overlay = { imageUrl: url, buttons: [] };
     else project.overlay.imageUrl = url;
+    await writeProject(project);
+    res.json({ url });
+  }
+);
+
+// チャプター別オーバーレイ画像アップロード
+app.post("/api/projects/:id/upload/chapter-overlay/:chapterId",
+  requireAuth, uploadOverlay.single("image"),
+  async (req, res) => {
+    const { id, chapterId } = req.params;
+    const ext = path.extname(req.file.originalname).toLowerCase() || ".png";
+    const key = `${id}/overlay_${chapterId}${ext}`;
+    let url;
+    if (useR2) {
+      url = await uploadToR2(key, req.file.buffer, req.file.mimetype || "image/png");
+    } else {
+      const dir = path.join(UPLOADS_DIR, id);
+      fs.mkdirSync(dir, { recursive: true });
+      await fsp.writeFile(path.join(dir, `overlay_${chapterId}${ext}`), req.file.buffer);
+      url = `/uploads/${key}`;
+    }
+    const project = await readProject(id);
+    const chapter = project.chapters.find((c) => c.id === chapterId);
+    if (!chapter) return res.status(404).json({ error: "Chapter not found" });
+    if (!chapter.overlay) chapter.overlay = { imageUrl: url, buttons: [] };
+    else chapter.overlay.imageUrl = url;
     await writeProject(project);
     res.json({ url });
   }

@@ -1,7 +1,7 @@
 import "./InteractivePlayer.css";
 
-export default function BranchMenu({ config, phase, onBranchSelect, onGoTop }) {
-  const { company, flow, theme } = config;
+export default function BranchMenu({ config, branches, phase, onBranchSelect, onGoTop }) {
+  const { company, theme } = config;
 
   return (
     <div className="branch-menu">
@@ -13,7 +13,7 @@ export default function BranchMenu({ config, phase, onBranchSelect, onGoTop }) {
         </div>
 
         <div className="branch-menu__buttons">
-          {flow.branches.map((branch) => (
+          {(branches || []).map((branch) => (
             <button
               key={branch.id}
               className="branch-btn"

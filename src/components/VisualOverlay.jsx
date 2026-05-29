@@ -7,8 +7,7 @@ function getAction(btn) {
   return "none";
 }
 
-export default function VisualOverlay({ config, onBranchSelect, onGoTop }) {
-  const { overlay, flow } = config;
+export default function VisualOverlay({ overlay, branches, onBranchSelect, onGoTop }) {
   if (!overlay?.imageUrl || !overlay?.buttons?.length) return null;
 
   const opacity = overlay.opacity ?? 1;
@@ -20,7 +19,7 @@ export default function VisualOverlay({ config, onBranchSelect, onGoTop }) {
     } else if (action === "url") {
       if (btn.url) window.open(btn.url, "_blank", "noopener");
     } else if (action === "branch") {
-      const branch = flow.branches.find((b) => b.id === btn.branchId);
+      const branch = (branches || []).find((b) => b.id === btn.branchId);
       if (branch) onBranchSelect(branch);
     }
   }

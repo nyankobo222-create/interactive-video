@@ -70,23 +70,8 @@ function ChapterRow({ chapter, projectId, onChange, onDelete, onMove, isFirst, i
   );
 }
 
-// ── ブランチ1個 ────────────────────────────────────────
+// ── 分岐1行（v2: nextChapterId） ──────────────────────────
 function BranchRow({ branch, allChapterIds, onChange, onDelete }) {
-  function addChapter(cid) {
-    if (!cid || branch.chapters.includes(cid)) return;
-    onChange({ ...branch, chapters: [...branch.chapters, cid] });
-  }
-  function removeChapter(cid) {
-    onChange({ ...branch, chapters: branch.chapters.filter((c) => c !== cid) });
-  }
-  function moveChapter(idx, dir) {
-    const arr = [...branch.chapters];
-    const swap = idx + dir;
-    if (swap < 0 || swap >= arr.length) return;
-    [arr[idx], arr[swap]] = [arr[swap], arr[idx]];
-    onChange({ ...branch, chapters: arr });
-  }
-
   return (
     <div className="branch-row">
       <div className="branch-row__header">
@@ -98,59 +83,156 @@ function BranchRow({ branch, allChapterIds, onChange, onDelete }) {
         />
         <input
           className="branch-row__sublabel"
-          value={branch.sublabel}
+          value={branch.sublabel || ""}
           onChange={(e) => onChange({ ...branch, sublabel: e.target.value })}
           placeholder="英語サブラベル（例：Zero to Pro）"
         />
+        <select
+          className="form-input branch-row__next-select"
+          value={branch.nextChapterId || ""}
+          onChange={(e) => onChange({ ...branch, nextChapterId: e.target.value || null })}
+        >
+          <option value="">次チャプター未設定</option>
+          {allChapterIds.map((cid) => (
+            <option key={cid} value={cid}>{cid}</option>
+          ))}
+        </select>
         <button className="btn-icon btn-icon--danger" onClick={onDelete} title="削除">✕</button>
       </div>
-      <div className="branch-row__chapters">
-        <span className="branch-row__ch-label">再生順：</span>
-        {branch.chapters.map((cid, i) => (
-          <span key={cid} className="branch-ch-tag">
-            {cid}
-            <button onClick={() => moveChapter(i, -1)} title="前へ">◀</button>
-            <button onClick={() => moveChapter(i,  1)} title="後へ">▶</button>
-            <button onClick={() => removeChapter(cid)} title="外す">✕</button>
-          </span>
-        ))}
-        <select
-          className="branch-row__add-select"
-          defaultValue=""
-          onChange={(e) => { addChapter(e.target.value); e.target.value = ""; }}
-        >
-          <option value="" disabled>＋ チャプターを追加</option>
-          {allChapterIds
-            .filter((cid) => !branch.chapters.includes(cid))
-            .map((cid) => <option key={cid} value={cid}>{cid}</option>)}
-        </select>
+    </div>
+  );
+}
+
+// ── チャプターごとの分岐設定セクション ──────────────────────
+function ChapterBranchSection({ chapter, allChapterIds, onChange }) {
+  const [expanded, setExpanded] = useState(!!(chapter.branches?.length > 0 || chapter.pauseAt || chapter.nextChapterId));
+  const hasBranches = chapter.branches?.length > 0;
+
+  function addBranch() {
+    const num = String((chapter.branches?.length || 0) + 1).padStart(2, "0");
+    const newBranch = {
+      id: `b${Date.now()}`,
+      label: `${num} ブランチ名`,
+      sublabel: "Subtitle",
+      nextChapterId: null,
+    };
+    onChange({ ...chapter, branches: [...(chapter.branches || []), newBranch] });
+  }
+
+  function updateBranch(updated) {
+    onChange({ ...chapter, branches: chapter.branches.map((b) => (b.id === updated.id ? updated : b)) });
+  }
+
+  function deleteBranch(bid) {
+    onChange({ ...chapter, branches: chapter.branches.filter((b) => b.id !== bid) });
+  }
+
+  return (
+    <div className={`chapter-branch-section${hasBranches ? " chapter-branch-section--active" : ""}`}>
+      <div className="chapter-branch-section__header" onClick={() => setExpanded((v) => !v)}>
+        <span className="chapter-branch-section__toggle">{expanded ? "▼" : "▶"}</span>
+        <span className="chapter-branch-section__id">{chapter.id}</span>
+        <span className="chapter-branch-section__label">{chapter.label}</span>
+        {hasBranches && (
+          <span className="chapter-branch-section__badge">{chapter.branches.length}分岐</span>
+        )}
+        {chapter.nextChapterId && !hasBranches && (
+          <span className="chapter-branch-section__next-badge">→ {chapter.nextChapterId}</span>
+        )}
       </div>
+
+      {expanded && (
+        <div className="chapter-branch-section__body">
+          <div className="chapter-branch-section__row">
+            <label className="form-label">
+              一時停止（秒）
+              <input
+                type="number"
+                className="form-input"
+                value={chapter.pauseAt ?? ""}
+                placeholder="動画終了時"
+                min={1}
+                style={{ maxWidth: 100 }}
+                onChange={(e) => onChange({ ...chapter, pauseAt: e.target.value ? Number(e.target.value) : null })}
+              />
+              <span className="form-hint">設定すると動画をX秒で止めて分岐を表示</span>
+            </label>
+
+            {!hasBranches && (
+              <label className="form-label">
+                次のチャプター（分岐なし）
+                <select
+                  className="form-input"
+                  value={chapter.nextChapterId || ""}
+                  onChange={(e) => onChange({ ...chapter, nextChapterId: e.target.value || null })}
+                  style={{ maxWidth: 200 }}
+                >
+                  <option value="">なし（エンドメニューへ）</option>
+                  {allChapterIds.filter((cid) => cid !== chapter.id).map((cid) => (
+                    <option key={cid} value={cid}>{cid}</option>
+                  ))}
+                </select>
+                <span className="form-hint">このチャプター終了後の遷移先</span>
+              </label>
+            )}
+          </div>
+
+          <div className="branch-list" style={{ marginTop: 8 }}>
+            {(chapter.branches || []).map((branch) => (
+              <BranchRow
+                key={branch.id}
+                branch={branch}
+                allChapterIds={allChapterIds.filter((cid) => cid !== chapter.id)}
+                onChange={updateBranch}
+                onDelete={() => deleteBranch(branch.id)}
+              />
+            ))}
+          </div>
+          <button className="btn btn--outline btn--sm" onClick={addBranch} style={{ marginTop: 8 }}>
+            ＋ 分岐を追加
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── ビジュアルエディター ────────────────────────────────────
 function VisualEditor({ project, onChange, onSave }) {
-  const [mode, setMode] = useState("overlay"); // "overlay" | "endOverlay"
-
-  const overlayKey = mode; // "overlay" or "endOverlay"
-  const uploadPath = mode === "overlay" ? "overlay" : "end-overlay";
-  const overlay = project[overlayKey] || { imageUrl: null, buttons: [] };
-  const buttons = overlay.buttons || [];
+  const firstChapterId = project.chapters[0]?.id || "__end__";
+  const [selectedTarget, setSelectedTarget] = useState(firstChapterId);
+  const containerRef = useRef();
+  const fileRef = useRef();
   const [uploading, setUploading] = useState(false);
   const [drawStart, setDrawStart] = useState(null);
   const [drawCur, setDrawCur] = useState(null);
   const [selected, setSelected] = useState(null);
-  const containerRef = useRef();
-  const fileRef = useRef();
 
-  // modeが切り替わったら選択解除
-  useEffect(() => { setSelected(null); }, [mode]);
+  useEffect(() => { setSelected(null); }, [selectedTarget]);
+
+  const isEndOverlay = selectedTarget === "__end__";
+  const currentChapter = isEndOverlay ? null : project.chapters.find((c) => c.id === selectedTarget);
+  const overlay = isEndOverlay
+    ? (project.endOverlay || { imageUrl: null, buttons: [] })
+    : (currentChapter?.overlay || { imageUrl: null, buttons: [] });
+  const branches = isEndOverlay ? [] : (currentChapter?.branches || []);
+  const uploadPath = isEndOverlay ? "end-overlay" : `chapter-overlay/${selectedTarget}`;
 
   function updateOverlay(newOverlay) {
-    const updated = { ...project, [overlayKey]: newOverlay };
-    onChange(updated);
-    return updated;
+    if (isEndOverlay) {
+      const updated = { ...project, endOverlay: newOverlay };
+      onChange(updated);
+      return updated;
+    } else {
+      const updated = {
+        ...project,
+        chapters: project.chapters.map((c) =>
+          c.id === selectedTarget ? { ...c, overlay: newOverlay } : c
+        ),
+      };
+      onChange(updated);
+      return updated;
+    }
   }
 
   async function handleImageUpload(e) {
@@ -167,7 +249,7 @@ function VisualEditor({ project, onChange, onSave }) {
       const { url } = await res.json();
       updateOverlay({ ...overlay, imageUrl: url });
     } catch (err) {
-      alert(`アップロード失敗: ${err.message}\nサーバーを再起動してください。`);
+      alert(`アップロード失敗: ${err.message}`);
     } finally {
       setUploading(false);
     }
@@ -203,12 +285,12 @@ function VisualEditor({ project, onChange, onSave }) {
     if (w < 2 || h < 2) return;
     const newBtn = {
       id: `btn${Date.now()}`,
-      action: mode === "endOverlay" ? "top" : "branch",
-      branchId: mode === "endOverlay" ? "" : (project.flow.branches[0]?.id || ""),
+      action: isEndOverlay ? "top" : "branch",
+      branchId: isEndOverlay ? "" : (branches[0]?.id || ""),
       url: "",
       x, y, width: w, height: h,
     };
-    updateOverlay({ ...overlay, buttons: [...buttons, newBtn] });
+    updateOverlay({ ...overlay, buttons: [...(overlay.buttons || []), newBtn] });
     setSelected(newBtn.id);
   }
 
@@ -218,11 +300,11 @@ function VisualEditor({ project, onChange, onSave }) {
   }
 
   function updateButton(updated) {
-    updateOverlay({ ...overlay, buttons: buttons.map((b) => (b.id === updated.id ? updated : b)) });
+    updateOverlay({ ...overlay, buttons: (overlay.buttons || []).map((b) => (b.id === updated.id ? updated : b)) });
   }
 
   function deleteButton(btnId) {
-    updateOverlay({ ...overlay, buttons: buttons.filter((b) => b.id !== btnId) });
+    updateOverlay({ ...overlay, buttons: (overlay.buttons || []).filter((b) => b.id !== btnId) });
     setSelected(null);
   }
 
@@ -233,29 +315,47 @@ function VisualEditor({ project, onChange, onSave }) {
     height: `${Math.abs(drawCur.y - drawStart.y)}%`,
   } : null;
 
+  const buttons = overlay.buttons || [];
   const selectedBtn = buttons.find((b) => b.id === selected);
 
   return (
     <div className="editor__section ve-section">
-      {/* モード切り替え */}
-      <div className="ve-mode-tabs">
-        <button
-          className={`ve-mode-tab ${mode === "overlay" ? "ve-mode-tab--active" : ""}`}
-          onClick={() => setMode("overlay")}
-        >
-          ブランチ選択用
-        </button>
-        <button
-          className={`ve-mode-tab ${mode === "endOverlay" ? "ve-mode-tab--active" : ""}`}
-          onClick={() => setMode("endOverlay")}
-        >
-          エンドメニュー用
-        </button>
+      {/* チャプター選択 */}
+      <div className="ve-target-selector">
+        <label className="form-label">
+          編集するチャプター
+          <select
+            className="form-input"
+            value={selectedTarget}
+            onChange={(e) => setSelectedTarget(e.target.value)}
+            style={{ maxWidth: 340 }}
+          >
+            {project.chapters
+              .filter((ch) => ch.id !== project.flow.endMenu)
+              .map((ch) => (
+                <option key={ch.id} value={ch.id}>
+                  {ch.id}：{ch.label}
+                  {ch.branches?.length > 0 ? `（${ch.branches.length}分岐）` : ""}
+                  {ch.overlay?.imageUrl ? " ✓" : ""}
+                </option>
+              ))}
+            <option value="__end__">
+              ── エンドオーバーレイ（終了後のボタン画面）{project.endOverlay?.imageUrl ? " ✓" : ""}
+            </option>
+          </select>
+        </label>
+        {!isEndOverlay && branches.length === 0 && (
+          <p className="ve-target-selector__hint">
+            このチャプターに分岐がありません。先に「分岐設定」タブで分岐を追加してください。
+          </p>
+        )}
       </div>
 
-      <div className="editor__section-header">
+      <div className="editor__section-header" style={{ marginTop: 16 }}>
         <h2 className="editor__section-title">
-          {mode === "overlay" ? "ブランチ選択オーバーレイ" : "エンドメニューオーバーレイ"}
+          {isEndOverlay
+            ? "エンドオーバーレイ（終了後のボタン画面）"
+            : `${selectedTarget}：${currentChapter?.label || ""} のオーバーレイ`}
         </h2>
         <button className="btn btn--outline btn--sm" onClick={() => fileRef.current.click()} disabled={uploading}>
           {uploading ? "アップロード中..." : overlay.imageUrl ? "画像を差し替え" : "UI画像をアップロード"}
@@ -281,7 +381,7 @@ function VisualEditor({ project, onChange, onSave }) {
             <img src={overlay.imageUrl} className="ve-image" draggable={false} alt="overlay" style={{ opacity: overlay.opacity ?? 1 }} />
 
             {buttons.map((btn) => {
-              const branch = project.flow.branches.find((b) => b.id === btn.branchId);
+              const branch = branches.find((b) => b.id === btn.branchId);
               return (
                 <div
                   key={btn.id}
@@ -294,7 +394,6 @@ function VisualEditor({ project, onChange, onSave }) {
               );
             })}
 
-            {/* 描画中: マウスイベントをキャプチャする透明オーバーレイ */}
             {drawStart && (
               <div
                 className="ve-draw-capture"
@@ -306,7 +405,7 @@ function VisualEditor({ project, onChange, onSave }) {
           </div>
 
           <div className="ve-panel">
-            {/* オーバーレイ設定（常時表示） */}
+            {/* オーバーレイ設定 */}
             <div>
               <h3 className="ve-panel__title">オーバーレイ設定</h3>
               <label className="form-label" style={{ marginTop: 10 }}>
@@ -320,14 +419,16 @@ function VisualEditor({ project, onChange, onSave }) {
                   className="ve-opacity-slider"
                 />
               </label>
-              <label className="ve-toggle-label">
-                <input
-                  type="checkbox"
-                  checked={overlay.showFromIntro ?? false}
-                  onChange={(e) => onSave(updateOverlay({ ...overlay, showFromIntro: e.target.checked }))}
-                />
-                オープニングから表示
-              </label>
+              {!isEndOverlay && (
+                <label className="ve-toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={overlay.showFromIntro ?? false}
+                    onChange={(e) => onSave(updateOverlay({ ...overlay, showFromIntro: e.target.checked }))}
+                  />
+                  再生開始から表示
+                </label>
+              )}
             </div>
             <hr className="ve-divider" />
 
@@ -340,65 +441,68 @@ function VisualEditor({ project, onChange, onSave }) {
               }
 
               return (
-              <>
-                <h3 className="ve-panel__title">ボタン設定</h3>
+                <>
+                  <h3 className="ve-panel__title">ボタン設定</h3>
 
-                <label className="form-label">
-                  アクション
-                  <select
-                    className="form-input"
-                    value={currentAction}
-                    onChange={(e) => setAction(e.target.value)}
-                  >
-                    <option value="none">なし</option>
-                    <option value="branch">ブランチへ移動</option>
-                    <option value="top">↩ トップへ戻る</option>
-                    <option value="url">URLを開く</option>
-                  </select>
-                </label>
-
-                {currentAction === "branch" && (
                   <label className="form-label">
-                    移動先ブランチ
+                    アクション
                     <select
                       className="form-input"
-                      value={selectedBtn.branchId || ""}
-                      onChange={(e) => updateButton({ ...selectedBtn, branchId: e.target.value })}
+                      value={currentAction}
+                      onChange={(e) => setAction(e.target.value)}
                     >
-                      <option value="">未設定</option>
-                      {project.flow.branches.map((b) => (
-                        <option key={b.id} value={b.id}>{b.label}</option>
-                      ))}
+                      <option value="none">なし</option>
+                      <option value="branch">ブランチへ移動</option>
+                      <option value="top">↩ トップへ戻る</option>
+                      <option value="url">URLを開く</option>
                     </select>
                   </label>
-                )}
 
-                {currentAction === "url" && (
-                  <label className="form-label">
-                    URL
-                    <input
-                      className="form-input"
-                      value={selectedBtn.url || ""}
-                      onChange={(e) => updateButton({ ...selectedBtn, url: e.target.value })}
-                      placeholder="https://... または tel:0120-XXX-XXX"
-                    />
-                    <span className="form-hint">電話は tel:0833-XX-XXXX の形式</span>
-                  </label>
-                )}
+                  {currentAction === "branch" && (
+                    <label className="form-label">
+                      移動先ブランチ
+                      <select
+                        className="form-input"
+                        value={selectedBtn.branchId || ""}
+                        onChange={(e) => updateButton({ ...selectedBtn, branchId: e.target.value })}
+                      >
+                        <option value="">未設定</option>
+                        {branches.map((b) => (
+                          <option key={b.id} value={b.id}>{b.label}</option>
+                        ))}
+                      </select>
+                      {branches.length === 0 && (
+                        <span className="form-hint">先に分岐設定タブで分岐を追加してください</span>
+                      )}
+                    </label>
+                  )}
 
-                <div className="ve-panel__pos">
-                  <span>X: {selectedBtn.x.toFixed(1)}%</span>
-                  <span>Y: {selectedBtn.y.toFixed(1)}%</span>
-                  <span>W: {selectedBtn.width.toFixed(1)}%</span>
-                  <span>H: {selectedBtn.height.toFixed(1)}%</span>
-                </div>
-                <button
-                  className="btn btn--outline btn--sm ve-panel__delete"
-                  onClick={() => deleteButton(selectedBtn.id)}
-                >
-                  このボタンを削除
-                </button>
-              </>
+                  {currentAction === "url" && (
+                    <label className="form-label">
+                      URL
+                      <input
+                        className="form-input"
+                        value={selectedBtn.url || ""}
+                        onChange={(e) => updateButton({ ...selectedBtn, url: e.target.value })}
+                        placeholder="https://... または tel:0120-XXX-XXX"
+                      />
+                      <span className="form-hint">電話は tel:0833-XX-XXXX の形式</span>
+                    </label>
+                  )}
+
+                  <div className="ve-panel__pos">
+                    <span>X: {selectedBtn.x.toFixed(1)}%</span>
+                    <span>Y: {selectedBtn.y.toFixed(1)}%</span>
+                    <span>W: {selectedBtn.width.toFixed(1)}%</span>
+                    <span>H: {selectedBtn.height.toFixed(1)}%</span>
+                  </div>
+                  <button
+                    className="btn btn--outline btn--sm ve-panel__delete"
+                    onClick={() => deleteButton(selectedBtn.id)}
+                  >
+                    このボタンを削除
+                  </button>
+                </>
               );
             })() : (
               <p className="ve-panel__hint">
@@ -488,37 +592,21 @@ export default function ProjectEditor() {
     while (ids.includes(newId)) { n++; newId = `C${String(n).padStart(2, "0")}`; }
     setProject((p) => ({
       ...p,
-      chapters: [...p.chapters, { id: newId, label: `チャプター${newId}`, url: null, demoDuration: 8 }],
-    }));
-  }
-
-  function updateBranch(updated) {
-    setProject((p) => ({
-      ...p,
-      flow: { ...p.flow, branches: p.flow.branches.map((b) => (b.id === updated.id ? updated : b)) },
-    }));
-  }
-  function deleteBranch(bid) {
-    setProject((p) => ({
-      ...p,
-      flow: { ...p.flow, branches: p.flow.branches.filter((b) => b.id !== bid) },
-    }));
-  }
-  function addBranch() {
-    const newBranch = {
-      id: `b${Date.now()}`,
-      label: `0${project.flow.branches.length + 1} ブランチ名`,
-      sublabel: "Subtitle",
-      chapters: [],
-    };
-    setProject((p) => ({
-      ...p,
-      flow: { ...p.flow, branches: [...p.flow.branches, newBranch] },
+      chapters: [...p.chapters, {
+        id: newId,
+        label: `チャプター${newId}`,
+        url: null,
+        demoDuration: 8,
+        pauseAt: null,
+        overlay: null,
+        branches: [],
+        nextChapterId: null,
+      }],
     }));
   }
 
   if (!project) return (
-    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100dvh", color:"#546e7a" }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100dvh", color: "#546e7a" }}>
       読み込み中...
     </div>
   );
@@ -548,7 +636,12 @@ export default function ProjectEditor() {
 
       {/* ── タブ ── */}
       <nav className="editor__tabs">
-        {[["basic","⚙ 基本設定"], ["chapters","🎬 チャプター管理"], ["branches","🔀 分岐設定"], ["visual","🖼 ビジュアルエディター"]].map(([key, label]) => (
+        {[
+          ["basic",    "⚙ 基本設定"],
+          ["chapters", "🎬 チャプター管理"],
+          ["branches", "🔀 分岐設定"],
+          ["visual",   "🖼 ビジュアルエディター"],
+        ].map(([key, label]) => (
           <button
             key={key}
             className={`editor__tab ${tab === key ? "editor__tab--active" : ""}`}
@@ -636,8 +729,8 @@ export default function ProjectEditor() {
                     style={{ maxWidth: 120 }}
                   />
                   <span style={{
-                    background: project.theme.primary, color:"#fff",
-                    padding: "6px 16px", borderRadius: 6, fontSize: "0.85rem", fontWeight: 700
+                    background: project.theme.primary, color: "#fff",
+                    padding: "6px 16px", borderRadius: 6, fontSize: "0.85rem", fontWeight: 700,
                   }}>
                     ボタンプレビュー
                   </span>
@@ -647,17 +740,6 @@ export default function ProjectEditor() {
 
             <h2 className="editor__section-title" style={{ marginTop: 32 }}>フロー設定</h2>
             <div className="form-grid">
-              <label className="form-label">
-                イントロ（C01）停止タイミング（秒）
-                <input
-                  className="form-input"
-                  type="number"
-                  value={project.flow.intro.pauseAt}
-                  onChange={(e) => setFlow("intro", { ...project.flow.intro, pauseAt: Number(e.target.value) })}
-                  style={{ maxWidth: 100 }}
-                />
-                <span className="form-hint">C01動画を何秒で止めてブランチ選択画面を表示するか</span>
-              </label>
               <label className="form-label">
                 エンドメニューチャプター
                 <select
@@ -671,7 +753,7 @@ export default function ProjectEditor() {
                     <option key={c.id} value={c.id}>{c.id}：{c.label}</option>
                   ))}
                 </select>
-                <span className="form-hint">全ブランチ終了後に再生するチャプター</span>
+                <span className="form-hint">全ルート終了後に再生するチャプター</span>
               </label>
             </div>
           </div>
@@ -712,29 +794,24 @@ export default function ProjectEditor() {
           <div className="editor__section">
             <div className="editor__section-header">
               <h2 className="editor__section-title">分岐（ブランチ）設定</h2>
-              <button className="btn btn--primary btn--sm" onClick={addBranch}>
-                ＋ ブランチを追加
-              </button>
             </div>
             <p className="editor__section-desc">
-              ボタンのラベルと、そのボタンを押したときに再生するチャプターの順番を設定してください。
+              チャプターごとに分岐先を設定します。▶ をクリックして展開し、分岐を追加してください。
+              「一時停止（秒）」を設定すると動画の途中で選択画面を表示できます。
             </p>
-            {project.flow.branches.length === 0 && (
-              <p style={{ color: "#90a4ae", marginTop: 24 }}>ブランチがまだありません。「＋ ブランチを追加」から作成してください。</p>
-            )}
-            <div className="branch-list">
-              {project.flow.branches.map((branch) => (
-                <BranchRow
-                  key={branch.id}
-                  branch={branch}
+            <div className="chapter-branch-list">
+              {project.chapters.map((chapter) => (
+                <ChapterBranchSection
+                  key={chapter.id}
+                  chapter={chapter}
                   allChapterIds={allChapterIds}
-                  onChange={updateBranch}
-                  onDelete={() => deleteBranch(branch.id)}
+                  onChange={updateChapter}
                 />
               ))}
             </div>
           </div>
         )}
+
         {/* ────── ビジュアルエディタータブ ────── */}
         {tab === "visual" && (
           <VisualEditor project={project} onChange={setProject} onSave={save} />

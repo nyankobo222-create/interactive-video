@@ -11,13 +11,11 @@ function formatTime(s) {
   return `${m}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
 }
 
-// iPad(iOS13+)はnavigator.platformが"MacIntel"かつmaxTouchPoints>1
 function isIOS() {
   return /iPhone|iPad|iPod/.test(navigator.userAgent) ||
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 
-// iframeの中かどうかを判定
 function isInIframe() {
   try { return window.self !== window.top; }
   catch { return true; }
@@ -100,8 +98,6 @@ function PlayPauseBtn({ isPlaying, onToggle, disabled }) {
   );
 }
 
-// isFakeFs: iOSの擬似フルスクリーン中かどうか
-// onEnterFakeFs / onExitFakeFs: 擬似フルスクリーンの制御コールバック
 function FullscreenBtn({ playerRef, videoRef, isFakeFs, onEnterFakeFs, onExitFakeFs }) {
   const [isRealFs, setIsRealFs] = useState(false);
 
@@ -126,7 +122,6 @@ function FullscreenBtn({ playerRef, videoRef, isFakeFs, onEnterFakeFs, onExitFak
     } else if (isFakeFs) {
       onExitFakeFs();
     } else if (isIOS()) {
-      // iOSはFullscreen API非対応のため擬似フルスクリーンを使用
       onEnterFakeFs();
     } else {
       const el = playerRef.current;
@@ -155,9 +150,8 @@ function FullscreenBtn({ playerRef, videoRef, isFakeFs, onEnterFakeFs, onExitFak
 export default function InteractivePlayer({ config }) {
   const videoRef = useRef(null);
   const playerRef = useRef(null);
-  const [phase, setPhase] = useState("intro");
+  const [phase, setPhase] = useState("playing");
   const [currentId, setCurrentId] = useState("C01");
-  const [queue, setQueue] = useState([]);
   const [started, setStarted] = useState(false);
   const [aspectRatio, setAspectRatio] = useState("16/9");
   const [playbackTime, setPlaybackTime] = useState(0);
@@ -175,14 +169,11 @@ export default function InteractivePlayer({ config }) {
   const chapter = chaptersMap[currentId];
   const isDemo = !chapter?.url;
 
-  // チャプター切り替え時に時間をリセット
   useEffect(() => {
     setPlaybackTime(0);
     if (isDemo && chapter) setDuration(chapter.demoDuration ?? 0);
   }, [currentId]);
 
-  // 擬似フルスクリーン: position:fixed でビューポート全体を覆う
-  // iframe内では親ページにpostMessageを送ってiframe自体を全画面拡大してもらう
   function enterFakeFs() {
     window.scrollTo(0, 1);
     document.body.style.overflow = "hidden";
@@ -202,7 +193,6 @@ export default function InteractivePlayer({ config }) {
     setIsFakeFs(false);
   }
 
-  // アンマウント時にbodyのoverflowを元に戻す
   useEffect(() => {
     return () => {
       document.body.style.overflow = "";
@@ -210,9 +200,8 @@ export default function InteractivePlayer({ config }) {
     };
   }, []);
 
-  const switchChapter = useCallback((id, nextQueue) => {
+  const switchChapter = useCallback((id) => {
     setCurrentId(id);
-    setQueue(nextQueue);
     const ch = chaptersMap[id];
     if (ch?.url && videoRef.current) {
       videoRef.current.src = ch.url;
@@ -230,7 +219,6 @@ export default function InteractivePlayer({ config }) {
     setStarted(true);
     send("play_start");
 
-    // iOSは擬似フルスクリーン、それ以外はネイティブFullscreen API
     if (isIOS()) {
       enterFakeFs();
     } else if (playerRef.current?.requestFullscreen) {
@@ -269,21 +257,23 @@ export default function InteractivePlayer({ config }) {
   function handleTogglePlay() {
     const video = videoRef.current;
     if (!video) return;
-    if (isPlaying) {
-      video.pause();
-    } else {
-      video.play().catch(() => {});
-    }
+    if (isPlaying) video.pause();
+    else video.play().catch(() => {});
   }
 
   const handleTimeUpdate = useCallback((t) => {
     setPlaybackTime(t);
-    const { intro } = config.flow;
-    if (currentId === intro.chapter && phase === "intro" && t >= intro.pauseAt) {
+    const ch = chaptersMap[currentId];
+    if (
+      ch?.pauseAt != null &&
+      ch.branches?.length > 0 &&
+      phase === "playing" &&
+      t >= ch.pauseAt
+    ) {
       if (videoRef.current) videoRef.current.pause();
       setPhase("branch_select");
     }
-  }, [currentId, phase, config]);
+  }, [currentId, phase, chaptersMap]);
 
   function handleSeek(t) {
     if (!isDemo && videoRef.current) {
@@ -293,42 +283,52 @@ export default function InteractivePlayer({ config }) {
   }
 
   const handleEnded = useCallback(() => {
-    if (currentId === config.flow.intro.chapter && phase === "intro") {
+    if (phase === "end_menu") return;
+
+    const ch = chaptersMap[currentId];
+
+    if (ch?.branches?.length > 0) {
       setPhase("branch_select");
       return;
     }
-    if (phase === "end_menu") return;
 
-    if (queue.length === 0) {
-      send("end_reached", { branchId: selectedBranchRef.current?.id, totalTime: elapsed() });
-      setPhase("end_menu");
-      switchChapter(config.flow.endMenu, []);
+    const nextId = ch?.nextChapterId;
+    if (nextId) {
+      if (nextId === config.flow.endMenu) {
+        send("end_reached", { branchId: selectedBranchRef.current?.id, totalTime: elapsed() });
+        setPhase("end_menu");
+      }
+      switchChapter(nextId);
       return;
     }
 
-    const [next, ...rest] = queue;
-    if (next === config.flow.endMenu) {
-      send("end_reached", { branchId: selectedBranchRef.current?.id, totalTime: elapsed() });
-      setPhase("end_menu");
-      switchChapter(next, []);
-    } else {
-      switchChapter(next, rest);
+    send("end_reached", { branchId: selectedBranchRef.current?.id, totalTime: elapsed() });
+    setPhase("end_menu");
+    if (config.flow.endMenu) {
+      switchChapter(config.flow.endMenu);
     }
-  }, [currentId, phase, queue, config, switchChapter, send, elapsed]);
+  }, [currentId, phase, chaptersMap, config, switchChapter, send, elapsed]);
 
   const handleBranchSelect = useCallback((branch) => {
     selectedBranchRef.current = branch;
     send("branch_select", { branchId: branch.id, branchLabel: branch.label });
-    const [first, ...rest] = branch.chapters;
-    setPhase("branch_playing");
-    switchChapter(first, [...rest, config.flow.endMenu]);
-  }, [config, switchChapter, send]);
+    if (!branch.nextChapterId) return;
+    setPhase("playing");
+    switchChapter(branch.nextChapterId);
+  }, [switchChapter, send]);
 
   const handleGoTop = useCallback(() => {
     send("top_return");
-    setPhase("intro");
-    switchChapter("C01", []);
+    setPhase("playing");
+    switchChapter("C01");
   }, [switchChapter, send]);
+
+  // 現在チャプターのオーバーレイ・分岐
+  const currentChapter = chaptersMap[currentId];
+  const currentOverlay = currentChapter?.overlay;
+  const currentBranches = currentChapter?.branches || [];
+  // エンドメニューではC01の分岐を再表示
+  const introBranches = chaptersMap["C01"]?.branches || [];
 
   return (
     <div
@@ -358,7 +358,7 @@ export default function InteractivePlayer({ config }) {
         />
       )}
 
-      {/* スタート画面（タップで再生） */}
+      {/* スタート画面 */}
       {!started && (
         <div className="player__start" onClick={handleStart}>
           <div className="player__start-btn">▶</div>
@@ -366,32 +366,53 @@ export default function InteractivePlayer({ config }) {
         </div>
       )}
 
-      {/* ブランチ選択・再生中のオーバーレイ */}
-      {config.overlay?.imageUrl && config.overlay?.buttons?.length > 0 ? (
-        (phase === "branch_select" || phase === "branch_playing" ||
-          (phase === "intro" && config.overlay?.showFromIntro)) && (
-          <VisualOverlay config={config} onBranchSelect={handleBranchSelect} onGoTop={handleGoTop} />
-        )
-      ) : (
-        <>
-          {phase === "branch_select" && (
-            <BranchMenu config={config} phase={phase} onBranchSelect={handleBranchSelect} onGoTop={handleGoTop} />
-          )}
-          {phase === "branch_playing" && (
-            <BottomBar config={config} onBranchSelect={handleBranchSelect} />
-          )}
-        </>
+      {/* showFromIntro: 再生中から表示するオーバーレイ */}
+      {started && phase === "playing" &&
+        currentOverlay?.showFromIntro &&
+        currentOverlay?.imageUrl &&
+        currentOverlay?.buttons?.length > 0 && (
+          <VisualOverlay
+            overlay={currentOverlay}
+            branches={currentBranches}
+            onBranchSelect={handleBranchSelect}
+            onGoTop={handleGoTop}
+          />
       )}
 
-      {/* エンドメニューのオーバーレイ */}
-      {phase === "end_menu" && (
-        config.endOverlay?.imageUrl && config.endOverlay?.buttons?.length > 0
+      {/* 分岐選択オーバーレイ */}
+      {phase === "branch_select" && (
+        currentOverlay?.imageUrl && currentOverlay?.buttons?.length > 0
           ? <VisualOverlay
-              config={{ ...config, overlay: config.endOverlay }}
+              overlay={currentOverlay}
+              branches={currentBranches}
               onBranchSelect={handleBranchSelect}
               onGoTop={handleGoTop}
             />
-          : <BranchMenu config={config} phase={phase} onBranchSelect={handleBranchSelect} onGoTop={handleGoTop} />
+          : <BranchMenu
+              config={config}
+              branches={currentBranches}
+              phase={phase}
+              onBranchSelect={handleBranchSelect}
+              onGoTop={handleGoTop}
+            />
+      )}
+
+      {/* エンドメニュー */}
+      {phase === "end_menu" && (
+        config.endOverlay?.imageUrl && config.endOverlay?.buttons?.length > 0
+          ? <VisualOverlay
+              overlay={config.endOverlay}
+              branches={introBranches}
+              onBranchSelect={handleBranchSelect}
+              onGoTop={handleGoTop}
+            />
+          : <BranchMenu
+              config={config}
+              branches={introBranches}
+              phase={phase}
+              onBranchSelect={handleBranchSelect}
+              onGoTop={handleGoTop}
+            />
       )}
 
       {/* コントロールバー */}
