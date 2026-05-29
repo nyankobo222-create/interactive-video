@@ -188,6 +188,7 @@
   overflow: hidden;
   user-select: none;
   background: #eceff1;
+  touch-action: none;
 }
 
 .ve-image {
@@ -232,6 +233,62 @@
   z-index: 20;
   cursor: crosshair;
 }
+
+/* リサイズハンドル */
+.ve-handle {
+  position: absolute;
+  width: 14px; height: 14px;
+  background: #fff;
+  border: 2px solid #e65100;
+  border-radius: 3px;
+  z-index: 15;
+  box-sizing: border-box;
+  /* タッチターゲットを広げる */
+  touch-action: none;
+}
+/* タッチ用に当たり判定を広げる疑似要素 */
+.ve-handle::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+.ve-handle--nw { top: -7px;  left: -7px;              cursor: nw-resize; }
+.ve-handle--n  { top: -7px;  left: calc(50% - 7px);   cursor: n-resize;  }
+.ve-handle--ne { top: -7px;  right: -7px;             cursor: ne-resize; }
+.ve-handle--e  { top: calc(50% - 7px); right: -7px;   cursor: e-resize;  }
+.ve-handle--se { bottom: -7px; right: -7px;           cursor: se-resize; }
+.ve-handle--s  { bottom: -7px; left: calc(50% - 7px); cursor: s-resize;  }
+.ve-handle--sw { bottom: -7px; left: -7px;            cursor: sw-resize; }
+.ve-handle--w  { top: calc(50% - 7px); left: -7px;    cursor: w-resize;  }
+
+/* パネル X/Y/W/H 編集可能入力 */
+.ve-panel__pos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  background: #f4f6f8;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.ve-panel__pos-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #78909c;
+}
+.ve-panel__pos-input {
+  padding: 3px 5px;
+  border: 1.5px solid #cfd8dc;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  color: #263238;
+  background: #fff;
+  width: 100%;
+  box-sizing: border-box;
+}
+.ve-panel__pos-input:focus { outline: none; border-color: #2a9824; }
 
 .ve-drawing {
   position: absolute;

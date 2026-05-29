@@ -11,6 +11,34 @@
 }
 .admin-home__logo { font-size: 1.1rem; font-weight: 700; letter-spacing: .05em; }
 
+/* ── スマートフォン対応 ── */
+@media (max-width: 600px) {
+  .admin-home__header {
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    gap: 10px;
+  }
+  .admin-home__logo {
+    width: 100%;
+    font-size: 1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .admin-home__header-actions {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+  }
+  .admin-home__header-actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+  .admin-home__main { padding: 16px 12px; }
+  .project-grid { grid-template-columns: 1fr; gap: 12px; }
+  .project-card { padding: 16px; }
+}
+
 .admin-home__main { flex: 1; padding: 32px; max-width: 1200px; margin: 0 auto; width: 100%; }
 .admin-home__empty { text-align: center; padding: 80px 0; color: #78909c; display: flex; flex-direction: column; align-items: center; gap: 20px; font-size: 1rem; }
 

@@ -38,10 +38,12 @@ export default function AdminHome() {
     <div className="admin-home">
       <header className="admin-home__header">
         <div className="admin-home__logo">🎬 インタラクティブ動画 管理システム</div>
-        <button className="btn btn--primary" onClick={createProject}>
-          ＋ 新規プロジェクト作成
-        </button>
-        <button className="btn btn--gray btn--sm" onClick={logout}>ログアウト</button>
+        <div className="admin-home__header-actions">
+          <button className="btn btn--primary" onClick={createProject}>
+            ＋ 新規プロジェクト作成
+          </button>
+          <button className="btn btn--gray btn--sm" onClick={logout}>ログアウト</button>
+        </div>
       </header>
 
       <main className="admin-home__main">

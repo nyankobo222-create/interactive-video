@@ -207,6 +207,8 @@ function VisualEditor({ project, onChange, onSave }) {
   const [drawStart, setDrawStart] = useState(null);
   const [drawCur, setDrawCur] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [dragging, setDragging] = useState(false);
+  const dragRef = useRef(null);
 
   useEffect(() => { setSelected(null); }, [selectedTarget]);
 
@@ -263,18 +265,91 @@ function VisualEditor({ project, onChange, onSave }) {
     };
   }
 
+  function clientXY(e) {
+    return e.touches?.length
+      ? { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY }
+      : { clientX: e.clientX, clientY: e.clientY };
+  }
+
+  function startMove(btn, e) {
+    e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
+    const { clientX, clientY } = clientXY(e);
+    setSelected(btn.id);
+    setDrawStart(null);
+    const rect = containerRef.current.getBoundingClientRect();
+    dragRef.current = { type: "move", btnId: btn.id, startBtn: { ...btn }, startX: clientX, startY: clientY, rect };
+    setDragging(true);
+  }
+
+  function startResize(btn, dir, e) {
+    e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
+    const { clientX, clientY } = clientXY(e);
+    const rect = containerRef.current.getBoundingClientRect();
+    dragRef.current = { type: "resize", btnId: btn.id, dir, startBtn: { ...btn }, startX: clientX, startY: clientY, rect };
+    setDragging(true);
+  }
+
+  function applyPointerMove(cx, cy) {
+    if (dragRef.current) {
+      const { type, startBtn, startX, startY, rect, dir } = dragRef.current;
+      const dx = ((cx - startX) / rect.width)  * 100;
+      const dy = ((cy - startY) / rect.height) * 100;
+      let { x, y, width, height } = startBtn;
+      if (type === "move") {
+        x = Math.max(0, Math.min(100 - width,  startBtn.x + dx));
+        y = Math.max(0, Math.min(100 - height, startBtn.y + dy));
+      } else {
+        if (dir.includes("e")) width  = Math.max(2, startBtn.width  + dx);
+        if (dir.includes("s")) height = Math.max(2, startBtn.height + dy);
+        if (dir.includes("w")) { const nw = Math.max(2, startBtn.width  - dx); x = startBtn.x + (startBtn.width  - nw); width  = nw; }
+        if (dir.includes("n")) { const nh = Math.max(2, startBtn.height - dy); y = startBtn.y + (startBtn.height - nh); height = nh; }
+        x = Math.max(0, x); y = Math.max(0, y);
+        width  = Math.min(width,  100 - x);
+        height = Math.min(height, 100 - y);
+      }
+      updateButton({ ...startBtn, x, y, width, height });
+      return;
+    }
+    if (!drawStart) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    setDrawCur({
+      x: Math.max(0, Math.min(100, ((cx - rect.left) / rect.width)  * 100)),
+      y: Math.max(0, Math.min(100, ((cy - rect.top)  / rect.height) * 100)),
+    });
+  }
+
   function handleMouseDown(e) {
+    if (dragging) return;
     setDrawStart(getPos(e));
     setDrawCur(getPos(e));
     setSelected(null);
   }
 
-  function handleMouseMove(e) {
-    if (!drawStart) return;
-    setDrawCur(getPos(e));
+  function handleTouchStart(e) {
+    if (dragging) return;
+    e.preventDefault();
+    const { clientX, clientY } = clientXY(e);
+    const rect = containerRef.current.getBoundingClientRect();
+    const pos = {
+      x: Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width)  * 100)),
+      y: Math.max(0, Math.min(100, ((clientY - rect.top)  / rect.height) * 100)),
+    };
+    setDrawStart(pos);
+    setDrawCur(pos);
+    setSelected(null);
   }
 
-  function handleMouseUp() {
+  function handleMouseMove(e) { applyPointerMove(e.clientX, e.clientY); }
+  function handleTouchMove(e)  { e.preventDefault(); const { clientX, clientY } = clientXY(e); applyPointerMove(clientX, clientY); }
+
+  function handlePointerEnd() {
+    if (dragRef.current) {
+      dragRef.current = null;
+      setDragging(false);
+      return;
+    }
     if (!drawStart || !drawCur) return;
     const x = Math.min(drawStart.x, drawCur.x);
     const y = Math.min(drawStart.y, drawCur.y);
@@ -295,6 +370,7 @@ function VisualEditor({ project, onChange, onSave }) {
   }
 
   function handleMouseLeave() {
+    if (dragRef.current) { dragRef.current = null; setDragging(false); }
     setDrawStart(null);
     setDrawCur(null);
   }
@@ -376,20 +452,31 @@ function VisualEditor({ project, onChange, onSave }) {
             className="ve-container"
             ref={containerRef}
             onMouseDown={handleMouseDown}
+            onTouchStart={handleTouchStart}
             onMouseLeave={handleMouseLeave}
           >
             <img src={overlay.imageUrl} className="ve-image" draggable={false} alt="overlay" style={{ opacity: overlay.opacity ?? 1 }} />
 
             {buttons.map((btn) => {
               const branch = branches.find((b) => b.id === btn.branchId);
+              const isSel = selected === btn.id;
               return (
                 <div
                   key={btn.id}
-                  className={`ve-button ${selected === btn.id ? "ve-button--selected" : ""}`}
-                  style={{ left: `${btn.x}%`, top: `${btn.y}%`, width: `${btn.width}%`, height: `${btn.height}%` }}
-                  onMouseDown={(e) => { e.stopPropagation(); setSelected(btn.id); setDrawStart(null); }}
+                  className={`ve-button ${isSel ? "ve-button--selected" : ""}`}
+                  style={{ left: `${btn.x}%`, top: `${btn.y}%`, width: `${btn.width}%`, height: `${btn.height}%`, cursor: "move" }}
+                  onMouseDown={(e) => startMove(btn, e)}
+                  onTouchStart={(e) => startMove(btn, e)}
                 >
                   <span className="ve-button__label">{branch?.label || "未設定"}</span>
+                  {isSel && ["nw","n","ne","e","se","s","sw","w"].map((dir) => (
+                    <div
+                      key={dir}
+                      className={`ve-handle ve-handle--${dir}`}
+                      onMouseDown={(e) => startResize(btn, dir, e)}
+                      onTouchStart={(e) => startResize(btn, dir, e)}
+                    />
+                  ))}
                 </div>
               );
             })}
@@ -398,7 +485,19 @@ function VisualEditor({ project, onChange, onSave }) {
               <div
                 className="ve-draw-capture"
                 onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
+                onMouseUp={handlePointerEnd}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handlePointerEnd}
+              />
+            )}
+            {dragging && (
+              <div
+                className="ve-draw-capture"
+                style={{ cursor: "grabbing" }}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handlePointerEnd}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handlePointerEnd}
               />
             )}
             {drawRect && <div className="ve-drawing" style={drawRect} />}
@@ -491,10 +590,19 @@ function VisualEditor({ project, onChange, onSave }) {
                   )}
 
                   <div className="ve-panel__pos">
-                    <span>X: {selectedBtn.x.toFixed(1)}%</span>
-                    <span>Y: {selectedBtn.y.toFixed(1)}%</span>
-                    <span>W: {selectedBtn.width.toFixed(1)}%</span>
-                    <span>H: {selectedBtn.height.toFixed(1)}%</span>
+                    {[["X", "x"], ["Y", "y"], ["W", "width"], ["H", "height"]].map(([label, key]) => (
+                      <label key={key} className="ve-panel__pos-item">
+                        {label}
+                        <input
+                          type="number"
+                          className="ve-panel__pos-input"
+                          value={Number(selectedBtn[key].toFixed(1))}
+                          min={0} max={100} step={0.5}
+                          onChange={(e) => updateButton({ ...selectedBtn, [key]: Number(e.target.value) })}
+                        />
+                        <span>%</span>
+                      </label>
+                    ))}
                   </div>
                   <button
                     className="btn btn--outline btn--sm ve-panel__delete"
