@@ -293,6 +293,9 @@ export default function InteractivePlayer({ config }) {
     }
 
     const nextId = ch?.nextChapterId;
+    if (nextId === "__stop__") {
+      return;
+    }
     if (nextId) {
       if (nextId === config.flow.endMenu) {
         send("end_reached", { branchId: selectedBranchRef.current?.id, totalTime: elapsed() });
@@ -312,7 +315,7 @@ export default function InteractivePlayer({ config }) {
   const handleBranchSelect = useCallback((branch) => {
     selectedBranchRef.current = branch;
     send("branch_select", { branchId: branch.id, branchLabel: branch.label });
-    if (!branch.nextChapterId) return;
+    if (!branch.nextChapterId || branch.nextChapterId === "__stop__") return;
     setPhase("playing");
     switchChapter(branch.nextChapterId);
   }, [switchChapter, send]);

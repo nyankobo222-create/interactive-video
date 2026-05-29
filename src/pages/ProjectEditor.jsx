@@ -71,7 +71,7 @@ function ChapterRow({ chapter, projectId, onChange, onDelete, onMove, isFirst, i
 }
 
 // ── 分岐1行（v2: nextChapterId） ──────────────────────────
-function BranchRow({ branch, allChapterIds, onChange, onDelete }) {
+function BranchRow({ branch, allChapterIds, currentChapterId, onChange, onDelete }) {
   return (
     <div className="branch-row">
       <div className="branch-row__header">
@@ -93,8 +93,11 @@ function BranchRow({ branch, allChapterIds, onChange, onDelete }) {
           onChange={(e) => onChange({ ...branch, nextChapterId: e.target.value || null })}
         >
           <option value="">次チャプター未設定</option>
+          <option value="__stop__">停止（そのまま終了）</option>
           {allChapterIds.map((cid) => (
-            <option key={cid} value={cid}>{cid}</option>
+            <option key={cid} value={cid}>
+              {cid}{cid === currentChapterId ? "（もう一度みる）" : ""}
+            </option>
           ))}
         </select>
         <button className="btn-icon btn-icon--danger" onClick={onDelete} title="削除">✕</button>
@@ -160,16 +163,19 @@ function ChapterBranchSection({ chapter, allChapterIds, onChange }) {
 
             {!hasBranches && (
               <label className="form-label">
-                次のチャプター（分岐なし）
+                動画終了時の動作
                 <select
                   className="form-input"
                   value={chapter.nextChapterId || ""}
                   onChange={(e) => onChange({ ...chapter, nextChapterId: e.target.value || null })}
-                  style={{ maxWidth: 200 }}
+                  style={{ maxWidth: 220 }}
                 >
-                  <option value="">なし（エンドメニューへ）</option>
-                  {allChapterIds.filter((cid) => cid !== chapter.id).map((cid) => (
-                    <option key={cid} value={cid}>{cid}</option>
+                  <option value="">エンドメニューへ</option>
+                  <option value="__stop__">停止（そのまま終了）</option>
+                  {allChapterIds.map((cid) => (
+                    <option key={cid} value={cid}>
+                      {cid}{cid === chapter.id ? "（このチャプター・もう一度みる）" : ""}
+                    </option>
                   ))}
                 </select>
                 <span className="form-hint">このチャプター終了後の遷移先</span>
@@ -182,7 +188,8 @@ function ChapterBranchSection({ chapter, allChapterIds, onChange }) {
               <BranchRow
                 key={branch.id}
                 branch={branch}
-                allChapterIds={allChapterIds.filter((cid) => cid !== chapter.id)}
+                allChapterIds={allChapterIds}
+                currentChapterId={chapter.id}
                 onChange={updateBranch}
                 onDelete={() => deleteBranch(branch.id)}
               />
