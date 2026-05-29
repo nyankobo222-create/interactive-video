@@ -158,6 +158,7 @@ export default function InteractivePlayer({ config }) {
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFakeFs, setIsFakeFs] = useState(false);
+  const [countdown, setCountdown] = useState(null);
 
   const { send, elapsed } = useAnalytics(config.id);
   const selectedBranchRef = useRef(null);
@@ -286,22 +287,26 @@ export default function InteractivePlayer({ config }) {
     if (phase === "end_menu") return;
 
     const ch = chaptersMap[currentId];
-
-    if (ch?.branches?.length > 0) {
-      setPhase("branch_select");
-      return;
-    }
-
     const nextId = ch?.nextChapterId;
+
     if (nextId === "__stop__") {
       return;
     }
     if (nextId) {
+      if (ch?.nextChapterDelay > 0) {
+        setCountdown({ seconds: ch.nextChapterDelay, targetId: nextId });
+        return;
+      }
       if (nextId === config.flow.endMenu) {
         send("end_reached", { branchId: selectedBranchRef.current?.id, totalTime: elapsed() });
         setPhase("end_menu");
       }
       switchChapter(nextId);
+      return;
+    }
+
+    if (ch?.branches?.length > 0) {
+      setPhase("branch_select");
       return;
     }
 
@@ -313,6 +318,7 @@ export default function InteractivePlayer({ config }) {
   }, [currentId, phase, chaptersMap, config, switchChapter, send, elapsed]);
 
   const handleBranchSelect = useCallback((branch) => {
+    setCountdown(null);
     selectedBranchRef.current = branch;
     send("branch_select", { branchId: branch.id, branchLabel: branch.label });
     if (!branch.nextChapterId || branch.nextChapterId === "__stop__") return;
@@ -321,10 +327,29 @@ export default function InteractivePlayer({ config }) {
   }, [switchChapter, send]);
 
   const handleGoTop = useCallback(() => {
+    setCountdown(null);
     send("top_return");
     setPhase("playing");
     switchChapter("C01");
   }, [switchChapter, send]);
+
+  useEffect(() => {
+    if (!countdown) return;
+    if (countdown.seconds <= 0) {
+      const targetId = countdown.targetId;
+      setCountdown(null);
+      if (targetId === config.flow.endMenu) {
+        send("end_reached", { branchId: selectedBranchRef.current?.id, totalTime: elapsed() });
+        setPhase("end_menu");
+      }
+      switchChapter(targetId);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setCountdown((prev) => prev ? { ...prev, seconds: prev.seconds - 1 } : null);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [countdown, config, switchChapter, send, elapsed]);
 
   // 現在チャプターのオーバーレイ・分岐
   const currentChapter = chaptersMap[currentId];
@@ -416,6 +441,14 @@ export default function InteractivePlayer({ config }) {
               onBranchSelect={handleBranchSelect}
               onGoTop={handleGoTop}
             />
+      )}
+
+      {/* カウントダウンオーバーレイ */}
+      {countdown && (
+        <div className="player__countdown">
+          <span className="player__countdown__text">{countdown.seconds}秒後に次へ移動</span>
+          <button className="player__countdown__cancel" onClick={() => setCountdown(null)}>キャンセル</button>
+        </div>
       )}
 
       {/* コントロールバー */}

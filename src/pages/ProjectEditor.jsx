@@ -139,8 +139,8 @@ function ChapterBranchSection({ chapter, allChapterIds, onChange }) {
         {hasBranches && (
           <span className="chapter-branch-section__badge">{chapter.branches.length}分岐</span>
         )}
-        {chapter.nextChapterId && !hasBranches && (
-          <span className="chapter-branch-section__next-badge">→ {chapter.nextChapterId}</span>
+        {chapter.nextChapterId && (
+          <span className="chapter-branch-section__next-badge">→ {chapter.nextChapterId === "__stop__" ? "停止" : chapter.nextChapterId}</span>
         )}
       </div>
 
@@ -161,24 +161,37 @@ function ChapterBranchSection({ chapter, allChapterIds, onChange }) {
               <span className="form-hint">設定すると動画をX秒で止めて分岐を表示</span>
             </label>
 
-            {!hasBranches && (
+            <label className="form-label">
+              動画終了時の動作
+              <select
+                className="form-input"
+                value={chapter.nextChapterId || ""}
+                onChange={(e) => onChange({ ...chapter, nextChapterId: e.target.value || null, nextChapterDelay: null })}
+                style={{ maxWidth: 220 }}
+              >
+                <option value="">{hasBranches ? "分岐を表示（デフォルト）" : "エンドメニューへ"}</option>
+                <option value="__stop__">停止（そのまま終了）</option>
+                {allChapterIds.map((cid) => (
+                  <option key={cid} value={cid}>
+                    {cid}{cid === chapter.id ? "（もう一度みる）" : ""}
+                  </option>
+                ))}
+              </select>
+              <span className="form-hint">このチャプター終了後の遷移先</span>
+            </label>
+            {chapter.nextChapterId && chapter.nextChapterId !== "__stop__" && (
               <label className="form-label">
-                動画終了時の動作
-                <select
+                移動まで待機（秒）
+                <input
+                  type="number"
                   className="form-input"
-                  value={chapter.nextChapterId || ""}
-                  onChange={(e) => onChange({ ...chapter, nextChapterId: e.target.value || null })}
-                  style={{ maxWidth: 220 }}
-                >
-                  <option value="">エンドメニューへ</option>
-                  <option value="__stop__">停止（そのまま終了）</option>
-                  {allChapterIds.map((cid) => (
-                    <option key={cid} value={cid}>
-                      {cid}{cid === chapter.id ? "（このチャプター・もう一度みる）" : ""}
-                    </option>
-                  ))}
-                </select>
-                <span className="form-hint">このチャプター終了後の遷移先</span>
+                  value={chapter.nextChapterDelay ?? ""}
+                  placeholder="即座に移動"
+                  min={1}
+                  style={{ maxWidth: 100 }}
+                  onChange={(e) => onChange({ ...chapter, nextChapterDelay: e.target.value ? Number(e.target.value) : null })}
+                />
+                <span className="form-hint">空欄=即座、数値=その秒数後に移動</span>
               </label>
             )}
           </div>
