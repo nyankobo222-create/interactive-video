@@ -480,6 +480,14 @@ function VisualEditor({ project, onChange, onSave }) {
         <button className="btn btn--outline btn--sm" onClick={() => fileRef.current.click()} disabled={uploading}>
           {uploading ? "アップロード中..." : overlay.imageUrl ? "画像を差し替え" : "UI画像をアップロード"}
         </button>
+        {overlay.imageUrl && (
+          <button
+            className="btn btn--danger btn--sm"
+            onClick={() => { setSelected(null); onSave(updateOverlay({ ...overlay, imageUrl: null, buttons: [] })); }}
+          >
+            画像を削除
+          </button>
+        )}
         <input ref={fileRef} type="file" accept="image/*,.svg" style={{ display: "none" }} onChange={handleImageUpload} />
       </div>
       <p className="editor__section-desc">
@@ -922,6 +930,22 @@ export default function ProjectEditor() {
                   ))}
                 </select>
                 <span className="form-hint">全ルート終了後に再生するチャプター</span>
+              </label>
+              <label className="form-label">
+                終了後メニュー
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                  <input
+                    type="checkbox"
+                    id="showEndMenu"
+                    checked={project.flow.showEndMenu !== false}
+                    onChange={(e) => setFlow("showEndMenu", e.target.checked)}
+                    style={{ width: 16, height: 16, cursor: "pointer" }}
+                  />
+                  <label htmlFor="showEndMenu" style={{ cursor: "pointer", fontWeight: 400, marginBottom: 0 }}>
+                    終了後にメニューを表示する
+                  </label>
+                </div>
+                <span className="form-hint">オフにすると最後の動画で止まりメニューを表示しません</span>
               </label>
             </div>
           </div>

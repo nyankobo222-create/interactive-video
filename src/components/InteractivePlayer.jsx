@@ -299,7 +299,7 @@ export default function InteractivePlayer({ config }) {
       }
       if (nextId === config.flow.endMenu) {
         send("end_reached", { branchId: selectedBranchRef.current?.id, totalTime: elapsed() });
-        setPhase("end_menu");
+        if (config.flow?.showEndMenu !== false) setPhase("end_menu");
       }
       switchChapter(nextId);
       return;
@@ -311,9 +311,9 @@ export default function InteractivePlayer({ config }) {
     }
 
     send("end_reached", { branchId: selectedBranchRef.current?.id, totalTime: elapsed() });
-    setPhase("end_menu");
-    if (config.flow.endMenu) {
-      switchChapter(config.flow.endMenu);
+    if (config.flow?.showEndMenu !== false) {
+      setPhase("end_menu");
+      if (config.flow.endMenu) switchChapter(config.flow.endMenu);
     }
   }, [currentId, phase, chaptersMap, config, switchChapter, send, elapsed]);
 
@@ -340,7 +340,7 @@ export default function InteractivePlayer({ config }) {
       setCountdown(null);
       if (targetId === config.flow.endMenu) {
         send("end_reached", { branchId: selectedBranchRef.current?.id, totalTime: elapsed() });
-        setPhase("end_menu");
+        if (config.flow?.showEndMenu !== false) setPhase("end_menu");
       }
       switchChapter(targetId);
       return;
