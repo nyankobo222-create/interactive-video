@@ -292,7 +292,7 @@ export default function InteractivePlayer({ config }) {
     if (nextId === "__stop__") {
       return;
     }
-    if (nextId) {
+    if (nextId && chaptersMap[nextId]) {
       if (ch?.nextChapterDelay > 0) {
         setCountdown({ seconds: ch.nextChapterDelay, targetId: nextId });
         return;

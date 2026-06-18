@@ -10,7 +10,7 @@ export default function DemoChapter({ id, chapter, config, isPaused, onTimeUpdat
   useEffect(() => { onTimeUpdateRef.current = onTimeUpdate; });
 
   useEffect(() => {
-    if (isPaused) return;
+    if (!chapter || isPaused) return;
 
     const duration = chapter.demoDuration;
     const startTime = performance.now();
@@ -29,8 +29,9 @@ export default function DemoChapter({ id, chapter, config, isPaused, onTimeUpdat
 
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [isPaused, chapter.demoDuration]);
+  }, [isPaused, chapter?.demoDuration]);
 
+  if (!chapter) return null;
   const progress = Math.min(elapsed / chapter.demoDuration, 1);
 
   return (

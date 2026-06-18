@@ -87,19 +87,31 @@ function BranchRow({ branch, allChapterIds, currentChapterId, onChange, onDelete
           onChange={(e) => onChange({ ...branch, sublabel: e.target.value })}
           placeholder="英語サブラベル（例：Zero to Pro）"
         />
-        <select
-          className="form-input branch-row__next-select"
-          value={branch.nextChapterId || ""}
-          onChange={(e) => onChange({ ...branch, nextChapterId: e.target.value || null })}
-        >
-          <option value="">次チャプター未設定</option>
-          <option value="__stop__">停止（そのまま終了）</option>
-          {allChapterIds.map((cid) => (
-            <option key={cid} value={cid}>
-              {cid}{cid === currentChapterId ? "（もう一度みる）" : ""}
-            </option>
-          ))}
-        </select>
+        {(() => {
+          const isBranchStale = branch.nextChapterId
+            && branch.nextChapterId !== "__stop__"
+            && !allChapterIds.includes(branch.nextChapterId);
+          return (
+            <select
+              className="form-input branch-row__next-select"
+              value={branch.nextChapterId || ""}
+              onChange={(e) => onChange({ ...branch, nextChapterId: e.target.value || null })}
+            >
+              <option value="">次チャプター未設定</option>
+              <option value="__stop__">停止（そのまま終了）</option>
+              {isBranchStale && (
+                <option value={branch.nextChapterId} disabled>
+                  ⚠ {branch.nextChapterId}（削除済み・無効）
+                </option>
+              )}
+              {allChapterIds.map((cid) => (
+                <option key={cid} value={cid}>
+                  {cid}{cid === currentChapterId ? "（もう一度みる）" : ""}
+                </option>
+              ))}
+            </select>
+          );
+        })()}
         <button className="btn-icon btn-icon--danger" onClick={onDelete} title="削除">✕</button>
       </div>
     </div>
@@ -163,20 +175,32 @@ function ChapterBranchSection({ chapter, allChapterIds, onChange }) {
 
             <label className="form-label">
               動画終了時の動作
-              <select
-                className="form-input"
-                value={chapter.nextChapterId || ""}
-                onChange={(e) => onChange({ ...chapter, nextChapterId: e.target.value || null, nextChapterDelay: null })}
-                style={{ maxWidth: 220 }}
-              >
-                <option value="">{hasBranches ? "分岐を表示（デフォルト）" : "エンドメニューへ"}</option>
-                <option value="__stop__">停止（そのまま終了）</option>
-                {allChapterIds.map((cid) => (
-                  <option key={cid} value={cid}>
-                    {cid}{cid === chapter.id ? "（もう一度みる）" : ""}
-                  </option>
-                ))}
-              </select>
+              {(() => {
+                const isStale = chapter.nextChapterId
+                  && chapter.nextChapterId !== "__stop__"
+                  && !allChapterIds.includes(chapter.nextChapterId);
+                return (
+                  <select
+                    className="form-input"
+                    value={chapter.nextChapterId || ""}
+                    onChange={(e) => onChange({ ...chapter, nextChapterId: e.target.value || null, nextChapterDelay: null })}
+                    style={{ maxWidth: 220 }}
+                  >
+                    <option value="">{hasBranches ? "分岐を表示（デフォルト）" : "エンドメニューへ"}</option>
+                    <option value="__stop__">停止（そのまま終了）</option>
+                    {isStale && (
+                      <option value={chapter.nextChapterId} disabled>
+                        ⚠ {chapter.nextChapterId}（削除済み・無効）
+                      </option>
+                    )}
+                    {allChapterIds.map((cid) => (
+                      <option key={cid} value={cid}>
+                        {cid}{cid === chapter.id ? "（もう一度みる）" : ""}
+                      </option>
+                    ))}
+                  </select>
+                );
+              })()}
               <span className="form-hint">このチャプター終了後の遷移先</span>
             </label>
             {chapter.nextChapterId && chapter.nextChapterId !== "__stop__" && (
@@ -702,7 +726,23 @@ export default function ProjectEditor() {
     }));
   }
   function deleteChapter(cid) {
-    setProject((p) => ({ ...p, chapters: p.chapters.filter((c) => c.id !== cid) }));
+    setProject((p) => ({
+      ...p,
+      chapters: p.chapters
+        .filter((c) => c.id !== cid)
+        .map((c) => ({
+          ...c,
+          nextChapterId: c.nextChapterId === cid ? null : c.nextChapterId,
+          branches: c.branches.map((b) => ({
+            ...b,
+            nextChapterId: b.nextChapterId === cid ? null : b.nextChapterId,
+          })),
+        })),
+      flow: {
+        ...p.flow,
+        endMenu: p.flow.endMenu === cid ? null : p.flow.endMenu,
+      },
+    }));
   }
   function moveChapterRow(idx, dir) {
     setProject((p) => {
